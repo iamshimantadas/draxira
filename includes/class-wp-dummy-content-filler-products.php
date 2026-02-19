@@ -1,21 +1,74 @@
 <?php
 /**
  * WooCommerce Products Dummy Content Generator
+ * 
+ * Handles generation of dummy WooCommerce products with variations,
+ * categories, attributes, and product meta data.
+ *
+ * @package WP_Dummy_Content_Filler
+ * @subpackage Includes
+ * @since 1.0.0
+ */
+
+/**
+ * Class WP_Dummy_Content_Filler_Products
+ * 
+ * Manages all WooCommerce product dummy content generation functionality.
+ *
+ * @since 1.0.0
+ * @access public
  */
 class WP_Dummy_Content_Filler_Products
 {
+    /**
+     * Singleton instance of the class
+     *
+     * @since 1.0.0
+     * @access private
+     * @var WP_Dummy_Content_Filler_Products|null
+     */
     private static $instance = null;
+
+    /**
+     * Product data loaded from CSV file
+     *
+     * @since 1.0.0
+     * @access private
+     * @var array
+     */
     private $product_data = [];
+
+    /**
+     * Path to the CSV data file
+     *
+     * @since 1.0.0
+     * @access private
+     * @var string
+     */
     private $csv_file_path;
 
-    // Product statuses
+    /**
+     * Available product statuses
+     *
+     * @since 1.0.0
+     * @access private
+     * @var array
+     */
     private $product_statuses = [
         'publish' => 'Published',
-        'draft' => 'Draft',
+        'draft'   => 'Draft',
         'pending' => 'Pending Review',
     ];
 
-    public static function get_instance()
+    /**
+     * Get singleton instance of the class
+     *
+     * @since 1.0.0
+     * @access public
+     * @static
+     * @return WP_Dummy_Content_Filler_Products Singleton instance
+     */
+    public static function mc_get_instance()
     {
         if (null === self::$instance) {
             self::$instance = new self();
@@ -23,27 +76,44 @@ class WP_Dummy_Content_Filler_Products
         return self::$instance;
     }
 
+    /**
+     * Constructor - Private to enforce singleton pattern
+     *
+     * @since 1.0.0
+     * @access private
+     */
     private function __construct()
     {
         $this->csv_file_path = WP_DUMMY_CONTENT_FILLER_PLUGIN_DIR . 'woo-data/walmart-products.csv';
-        $this->init_hooks();
-        $this->load_product_data();
+        $this->mc_init_hooks();
+        $this->mc_load_product_data();
     }
 
-    private function init_hooks()
+    /**
+     * Initialize all WordPress hooks
+     *
+     * @since 1.0.0
+     * @access private
+     * @return void
+     */
+    private function mc_init_hooks()
     {
         // Handle product generation
-        add_action('admin_init', [$this, 'handle_product_actions']);
+        add_action('admin_init', [$this, 'mc_handle_product_actions']);
 
         // AJAX handlers
-        add_action('wp_ajax_wpdcf_get_product_meta', [$this, 'ajax_get_product_meta']);
-        add_action('wp_ajax_wpdcf_get_dummy_products', [$this, 'ajax_get_dummy_products']);
+        add_action('wp_ajax_wpdcf_get_product_meta', [$this, 'mc_ajax_get_product_meta']);
+        add_action('wp_ajax_wpdcf_get_dummy_products', [$this, 'mc_ajax_get_dummy_products']);
     }
 
     /**
      * Load product data from CSV file
+     *
+     * @since 1.0.0
+     * @access private
+     * @return void
      */
-    private function load_product_data()
+    private function mc_load_product_data()
     {
         if (!file_exists($this->csv_file_path)) {
             return;
@@ -54,8 +124,8 @@ class WP_Dummy_Content_Filler_Products
             return;
         }
 
-        $headers = [];
-        $data = [];
+        $headers  = [];
+        $data     = [];
         $row_count = 0;
         $max_rows = 100; // Limit to prevent memory issues
 
@@ -80,29 +150,37 @@ class WP_Dummy_Content_Filler_Products
 
     /**
      * Get available product data from CSV
+     *
+     * @since 1.0.0
+     * @access public
+     * @return array Product data array
      */
-    public function get_available_product_data()
+    public function mc_get_available_product_data()
     {
         return $this->product_data;
     }
 
     /**
      * Handle product form submissions
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
      */
-    public function handle_product_actions()
+    public function mc_handle_product_actions()
     {
         if (!current_user_can('manage_options')) {
             return;
         }
 
         if (isset($_POST['generate_products']) && wp_verify_nonce($_POST['_wpnonce'] ?? '', 'generate_dummy_products')) {
-            $this->generate_dummy_products();
+            $this->mc_generate_dummy_products();
         }
 
         $clear_products_nonce_action = 'clear_dummy_products';
         if (wp_verify_nonce($_REQUEST['_wpnonce'] ?? '', $clear_products_nonce_action)) {
             if (isset($_REQUEST['clear_dummy_products'])) {
-                $deleted_count = $this->clear_dummy_products();
+                $deleted_count = $this->mc_clear_dummy_products();
 
                 set_transient('dummy_product_results', [
                     'message' => sprintf(
@@ -122,33 +200,37 @@ class WP_Dummy_Content_Filler_Products
     /**
      * Get WooCommerce product meta fields
      * Excluding our meta key
+     *
+     * @since 1.0.0
+     * @access private
+     * @return array Array of product meta keys with labels
      */
-    private function get_product_meta_keys()
+    private function mc_get_product_meta_keys()
     {
         $meta_keys = [];
 
         // Default WooCommerce product meta fields
         $default_woo_fields = [
-            '_price' => 'Price',
-            '_regular_price' => 'Regular Price',
-            '_sale_price' => 'Sale Price',
-            '_sku' => 'SKU',
-            '_stock_status' => 'Stock Status',
-            '_manage_stock' => 'Manage Stock',
-            '_stock' => 'Stock Quantity',
-            '_weight' => 'Weight',
-            '_length' => 'Length',
-            '_width' => 'Width',
-            '_height' => 'Height',
-            '_virtual' => 'Virtual Product',
-            '_downloadable' => 'Downloadable',
-            '_tax_status' => 'Tax Status',
-            '_tax_class' => 'Tax Class',
-            '_purchase_note' => 'Purchase Note',
-            '_featured' => 'Featured Product',
-            '_visibility' => 'Visibility',
-            '_backorders' => 'Backorders',
-            '_sold_individually' => 'Sold Individually',
+            '_price'              => 'Price',
+            '_regular_price'      => 'Regular Price',
+            '_sale_price'         => 'Sale Price',
+            '_sku'                => 'SKU',
+            '_stock_status'       => 'Stock Status',
+            '_manage_stock'       => 'Manage Stock',
+            '_stock'              => 'Stock Quantity',
+            '_weight'             => 'Weight',
+            '_length'             => 'Length',
+            '_width'              => 'Width',
+            '_height'             => 'Height',
+            '_virtual'            => 'Virtual Product',
+            '_downloadable'       => 'Downloadable',
+            '_tax_status'         => 'Tax Status',
+            '_tax_class'          => 'Tax Class',
+            '_purchase_note'      => 'Purchase Note',
+            '_featured'           => 'Featured Product',
+            '_visibility'         => 'Visibility',
+            '_backorders'         => 'Backorders',
+            '_sold_individually'  => 'Sold Individually',
             '_product_image_gallery' => 'Product Gallery',
         ];
 
@@ -235,8 +317,12 @@ class WP_Dummy_Content_Filler_Products
 
     /**
      * Get WooCommerce product taxonomies
+     *
+     * @since 1.0.0
+     * @access private
+     * @return array Array of product taxonomies with labels
      */
-    private function get_product_taxonomies()
+    private function mc_get_product_taxonomies()
     {
         $taxonomies = get_object_taxonomies('product', 'objects');
         $available_taxonomies = [];
@@ -250,23 +336,30 @@ class WP_Dummy_Content_Filler_Products
         return $available_taxonomies;
     }
 
-    private function generate_dummy_products()
+    /**
+     * Generate dummy products based on form submission
+     *
+     * @since 1.0.0
+     * @access private
+     * @return void
+     */
+    private function mc_generate_dummy_products()
     {
         if (!class_exists('WooCommerce')) {
             set_transient('dummy_product_results', [
                 'message' => 'WooCommerce is not installed or activated.',
-                'type' => 'error'
+                'type'    => 'error'
             ], 30);
             wp_safe_redirect(admin_url('admin.php?page=wp-dummy-content-filler-products'));
             exit;
         }
 
-        $count = intval($_POST['product_count'] ?? 5);
-        $product_status = sanitize_text_field($_POST['product_status'] ?? 'publish');
-        $with_featured_image = isset($_POST['with_featured_image']);
-        $with_gallery = isset($_POST['with_gallery']);
-        $create_excerpt = isset($_POST['create_excerpt']);
-        $product_author = intval($_POST['product_author'] ?? get_current_user_id());
+        $count                = intval($_POST['product_count'] ?? 5);
+        $product_status       = sanitize_text_field($_POST['product_status'] ?? 'publish');
+        $with_featured_image  = isset($_POST['with_featured_image']);
+        $with_gallery         = isset($_POST['with_gallery']);
+        $create_excerpt       = isset($_POST['create_excerpt']);
+        $product_author       = intval($_POST['product_author'] ?? get_current_user_id());
 
         // Get product meta configurations
         $product_meta_config = [];
@@ -299,24 +392,24 @@ class WP_Dummy_Content_Filler_Products
         $created_terms = [];
         if (!empty($taxonomy_config)) {
             foreach ($taxonomy_config as $taxonomy => $config) {
-                $terms = $this->create_dummy_terms($taxonomy, 10);
+                $terms = $this->mc_create_dummy_terms($taxonomy, 10);
                 $created_terms[$taxonomy] = $terms;
                 $results['taxonomies_created'] += count($terms);
             }
         }
 
         // Generate products
-        $available_data = $this->get_available_product_data();
-        $data_count = count($available_data);
+        $available_data = $this->mc_get_available_product_data();
+        $data_count     = count($available_data);
 
         for ($i = 0; $i < $count; $i++) {
-            $data_index = $i % $data_count; // Cycle through available data
+            $data_index   = $i % $data_count; // Cycle through available data
             $product_data = ($data_count > 0) ? $available_data[$data_index] : [];
 
-            $product_id = $this->create_dummy_product(
+            $product_id = $this->mc_create_dummy_product(
                 $product_status,
                 $with_featured_image,
-                $with_gallery,  // Pass gallery option
+                $with_gallery,
                 $create_excerpt,
                 $product_author,
                 $product_meta_config,
@@ -346,8 +439,23 @@ class WP_Dummy_Content_Filler_Products
         exit;
     }
 
-
-    private function create_dummy_product(
+    /**
+     * Create a single dummy product
+     *
+     * @since 1.0.0
+     * @access private
+     * @param string $status               Product status
+     * @param bool   $with_featured_image  Whether to add featured image
+     * @param bool   $with_gallery         Whether to add gallery images
+     * @param bool   $create_excerpt       Whether to create excerpt
+     * @param int    $author               Author ID
+     * @param array  $meta_config          Meta field configurations
+     * @param array  $created_terms        Created taxonomy terms
+     * @param array  $taxonomy_config      Taxonomy configurations
+     * @param array  $product_data         Product data from CSV
+     * @return int|false Product ID on success, false on failure
+     */
+    private function mc_create_dummy_product(
         $status = 'publish',
         $with_featured_image = false,
         $with_gallery = false,
@@ -387,11 +495,11 @@ class WP_Dummy_Content_Filler_Products
 
         // Create product - always use simple product type
         $product_args = [
-            'post_title' => wp_trim_words($product_name, 10, '...'),
+            'post_title'   => wp_trim_words($product_name, 10, '...'),
             'post_content' => $product_description,
-            'post_status' => $status,
-            'post_type' => 'product',
-            'post_author' => $author,
+            'post_status'  => $status,
+            'post_type'    => 'product',
+            'post_author'  => $author,
         ];
 
         // Add excerpt if requested
@@ -412,16 +520,16 @@ class WP_Dummy_Content_Filler_Products
             update_post_meta($product_id, WP_DUMMY_CONTENT_FILLER_META_KEY, '1');
 
             // Set basic WooCommerce meta
-            $this->set_basic_product_meta($product_id, $product_data);
+            $this->mc_set_basic_product_meta($product_id, $product_data);
 
             // Add featured image if requested
             if ($with_featured_image) {
-                $this->attach_featured_image($product_id, $product_data);
+                $this->mc_attach_featured_image($product_id, $product_data);
             }
 
             // Add product gallery if requested
             if ($with_gallery) {
-                $this->attach_product_gallery($product_id);
+                $this->mc_attach_product_gallery($product_id);
             }
 
             // Assign taxonomies with special handling for product_brand
@@ -457,7 +565,7 @@ class WP_Dummy_Content_Filler_Products
 
                 // Only set meta if type is not empty string
                 if (!empty($config['type'])) {
-                    $meta_value = $this->get_product_meta_value($meta_key, $config, $product_data);
+                    $meta_value = $this->mc_get_product_meta_value($meta_key, $config, $product_data);
                     if ($meta_value !== '' && $meta_value !== null) {
                         update_post_meta($product_id, $meta_key, $meta_value);
                     }
@@ -470,11 +578,16 @@ class WP_Dummy_Content_Filler_Products
         return false;
     }
 
-
     /**
      * Set basic WooCommerce product meta from CSV data
+     *
+     * @since 1.0.0
+     * @access private
+     * @param int   $product_id   Product ID
+     * @param array $product_data Product data from CSV
+     * @return void
      */
-    private function set_basic_product_meta($product_id, $product_data)
+    private function mc_set_basic_product_meta($product_id, $product_data)
     {
         // Set price from CSV data
         if (!empty($product_data['final_price'])) {
@@ -536,7 +649,7 @@ class WP_Dummy_Content_Filler_Products
         }
 
         // Set virtual and downloadable flags randomly
-        $virtual = (wp_rand(1, 10) === 1) ? 'yes' : 'no'; // 10% chance to be virtual
+        $virtual      = (wp_rand(1, 10) === 1) ? 'yes' : 'no'; // 10% chance to be virtual
         update_post_meta($product_id, '_virtual', $virtual);
 
         $downloadable = (wp_rand(1, 5) === 1) ? 'yes' : 'no'; // 20% chance to be downloadable
@@ -547,8 +660,17 @@ class WP_Dummy_Content_Filler_Products
         update_post_meta($product_id, '_featured', $featured);
     }
 
-
-    private function get_product_meta_value($meta_key, $config, $product_data)
+    /**
+     * Get product meta value based on configuration
+     *
+     * @since 1.0.0
+     * @access private
+     * @param string $meta_key     Meta key
+     * @param array  $config       Meta configuration
+     * @param array  $product_data Product data from CSV
+     * @return mixed Meta value
+     */
+    private function mc_get_product_meta_value($meta_key, $config, $product_data)
     {
         // Skip our meta key
         if ($meta_key === '_mc_wp_dummy_content_filler') {
@@ -562,9 +684,9 @@ class WP_Dummy_Content_Filler_Products
 
         // Use faker type if specified
         if ($config['type'] !== '' && $config['type'] !== 'custom') {
-            $faker = $this->get_faker();
+            $faker = $this->mc_get_faker();
             if ($faker) {
-                return $this->generate_faker_value($config['type']);
+                return $this->mc_generate_faker_value($config['type']);
             }
         }
 
@@ -612,11 +734,14 @@ class WP_Dummy_Content_Filler_Products
         }
     }
 
-
     /**
      * Get Faker instance
+     *
+     * @since 1.0.0
+     * @access private
+     * @return Faker\Generator|false Faker instance or false if not available
      */
-    private function get_faker()
+    private function mc_get_faker()
     {
         if (class_exists('Faker\Factory')) {
             return Faker\Factory::create();
@@ -626,35 +751,41 @@ class WP_Dummy_Content_Filler_Products
 
     /**
      * Generate faker value
+     *
+     * @since 1.0.0
+     * @access private
+     * @param string $type Faker data type
+     * @return string|int|float Generated value
      */
-    private function generate_faker_value($type)
+    private function mc_generate_faker_value($type)
     {
-        $faker = $this->get_faker();
-        if (!$faker)
+        $faker = $this->mc_get_faker();
+        if (!$faker) {
             return '';
+        }
 
         $methods = [
-            'text' => 'sentence',
-            'paragraphs' => 'paragraphs',
-            'words' => 'words',
-            'name' => 'name',
-            'email' => 'email',
-            'phone' => 'phoneNumber',
-            'address' => 'address',
-            'city' => 'city',
-            'country' => 'country',
-            'zipcode' => 'postcode',
-            'number' => 'numberBetween',
-            'price' => 'randomFloat',
-            'date' => 'date',
-            'boolean' => 'boolean',
-            'url' => 'url',
+            'text'      => 'sentence',
+            'paragraphs'=> 'paragraphs',
+            'words'     => 'words',
+            'name'      => 'name',
+            'email'     => 'email',
+            'phone'     => 'phoneNumber',
+            'address'   => 'address',
+            'city'      => 'city',
+            'country'   => 'country',
+            'zipcode'   => 'postcode',
+            'number'    => 'numberBetween',
+            'price'     => 'randomFloat',
+            'date'      => 'date',
+            'boolean'   => 'boolean',
+            'url'       => 'url',
             'image_url' => 'imageUrl',
-            'color' => 'colorName',
+            'color'     => 'colorName',
             'hex_color' => 'hexColor',
-            'latitude' => 'latitude',
+            'latitude'  => 'latitude',
             'longitude' => 'longitude',
-            'company' => 'company',
+            'company'   => 'company',
         ];
 
         if (isset($methods[$type])) {
@@ -673,12 +804,17 @@ class WP_Dummy_Content_Filler_Products
         return '';
     }
 
-
     /**
      * Attach featured image to product
      * First try CSV image_url, then fall back to plugin assets
+     *
+     * @since 1.0.0
+     * @access private
+     * @param int   $product_id   Product ID
+     * @param array $product_data Product data from CSV
+     * @return bool True on success, false on failure
      */
-    private function attach_featured_image($product_id, $product_data)
+    private function mc_attach_featured_image($product_id, $product_data)
     {
         // First, try to use image from CSV data
         if (!empty($product_data['image_urls'])) {
@@ -690,7 +826,7 @@ class WP_Dummy_Content_Filler_Products
                 if (is_array($image_urls) && !empty($image_urls)) {
                     $first_image = $image_urls[0];
                     if (is_string($first_image) && filter_var($first_image, FILTER_VALIDATE_URL)) {
-                        $attachment_id = $this->upload_image_from_url($first_image, $product_id . '-featured');
+                        $attachment_id = $this->mc_upload_image_from_url($first_image, $product_id . '-featured');
                         if ($attachment_id) {
                             set_post_thumbnail($product_id, $attachment_id);
                             return true;
@@ -699,7 +835,7 @@ class WP_Dummy_Content_Filler_Products
                 }
             } else if (is_string($image_urls) && filter_var($image_urls, FILTER_VALIDATE_URL)) {
                 // Single image URL
-                $attachment_id = $this->upload_image_from_url($image_urls, $product_id . '-featured');
+                $attachment_id = $this->mc_upload_image_from_url($image_urls, $product_id . '-featured');
                 if ($attachment_id) {
                     set_post_thumbnail($product_id, $attachment_id);
                     return true;
@@ -722,7 +858,7 @@ class WP_Dummy_Content_Filler_Products
         }
 
         $random_image = $product_images[array_rand($product_images)];
-        $filename = basename($random_image);
+        $filename     = basename($random_image);
 
         // Check if image already exists in media library
         $existing_image = get_page_by_title($filename, OBJECT, 'attachment');
@@ -739,9 +875,9 @@ class WP_Dummy_Content_Filler_Products
             $wp_filetype = wp_check_filetype($filename, null);
             $attachment = [
                 'post_mime_type' => $wp_filetype['type'],
-                'post_title' => preg_replace('/\.[^.]+$/', '', $filename),
-                'post_content' => '',
-                'post_status' => 'inherit'
+                'post_title'     => preg_replace('/\.[^.]+$/', '', $filename),
+                'post_content'   => '',
+                'post_status'    => 'inherit'
             ];
 
             $attachment_id = wp_insert_attachment($attachment, $upload_file['file']);
@@ -758,11 +894,16 @@ class WP_Dummy_Content_Filler_Products
         return false;
     }
 
-
     /**
      * Upload image from URL
+     *
+     * @since 1.0.0
+     * @access private
+     * @param string $image_url     Image URL
+     * @param string $filename_base Base filename
+     * @return int|false Attachment ID on success, false on failure
      */
-    private function upload_image_from_url($image_url, $filename_base)
+    private function mc_upload_image_from_url($image_url, $filename_base)
     {
         if (!filter_var($image_url, FILTER_VALIDATE_URL)) {
             return false;
@@ -802,9 +943,9 @@ class WP_Dummy_Content_Filler_Products
             $wp_filetype = wp_check_filetype($filename, null);
             $attachment = [
                 'post_mime_type' => $wp_filetype['type'],
-                'post_title' => preg_replace('/\.[^.]+$/', '', $filename),
-                'post_content' => '',
-                'post_status' => 'inherit'
+                'post_title'     => preg_replace('/\.[^.]+$/', '', $filename),
+                'post_content'   => '',
+                'post_status'    => 'inherit'
             ];
 
             $attachment_id = wp_insert_attachment($attachment, $upload_file['file']);
@@ -822,8 +963,13 @@ class WP_Dummy_Content_Filler_Products
 
     /**
      * Attach product gallery images from products folder only
+     *
+     * @since 1.0.0
+     * @access private
+     * @param int $product_id Product ID
+     * @return void
      */
-    private function attach_product_gallery($product_id)
+    private function mc_attach_product_gallery($product_id)
     {
         $image_dir = WP_DUMMY_CONTENT_FILLER_PLUGIN_DIR . 'assets/img/products/';
 
@@ -863,9 +1009,9 @@ class WP_Dummy_Content_Filler_Products
                 $wp_filetype = wp_check_filetype($filename, null);
                 $attachment = [
                     'post_mime_type' => $wp_filetype['type'],
-                    'post_title' => preg_replace('/\.[^.]+$/', '', $filename),
-                    'post_content' => '',
-                    'post_status' => 'inherit'
+                    'post_title'     => preg_replace('/\.[^.]+$/', '', $filename),
+                    'post_content'   => '',
+                    'post_status'    => 'inherit'
                 ];
 
                 $attachment_id = wp_insert_attachment($attachment, $upload_file['file']);
@@ -887,25 +1033,31 @@ class WP_Dummy_Content_Filler_Products
 
     /**
      * Create dummy taxonomy terms
+     *
+     * @since 1.0.0
+     * @access private
+     * @param string $taxonomy Taxonomy slug
+     * @param int    $count    Number of terms to create
+     * @return array Array of created term IDs
      */
-    private function create_dummy_terms($taxonomy, $count = 10)
+    private function mc_create_dummy_terms($taxonomy, $count = 10)
     {
-        $faker = $this->get_faker();
+        $faker = $this->mc_get_faker();
         $created_terms = [];
 
         // Get existing terms to avoid duplicates
         $existing_terms = get_terms([
-            'taxonomy' => $taxonomy,
+            'taxonomy'   => $taxonomy,
             'hide_empty' => false,
-            'fields' => 'names'
+            'fields'     => 'names'
         ]);
 
         if (is_wp_error($existing_terms)) {
             $existing_terms = [];
         }
 
-        $created = 0;
-        $attempts = 0;
+        $created      = 0;
+        $attempts     = 0;
         $max_attempts = $count * 3;
 
         while ($created < $count && $attempts < $max_attempts) {
@@ -931,7 +1083,7 @@ class WP_Dummy_Content_Filler_Products
             $term_slug = sanitize_title($term_name . '-' . wp_rand(100, 999));
 
             $term = wp_insert_term($term_name, $taxonomy, [
-                'slug' => $term_slug,
+                'slug'        => $term_slug,
                 'description' => $faker ? $faker->sentence() : 'Dummy term description'
             ]);
 
@@ -950,22 +1102,26 @@ class WP_Dummy_Content_Filler_Products
 
     /**
      * Clear dummy products
+     *
+     * @since 1.0.0
+     * @access private
+     * @return int Number of deleted products
      */
-    private function clear_dummy_products()
+    private function mc_clear_dummy_products()
     {
         global $wpdb;
 
         $args = [
-            'post_type' => 'product',
+            'post_type'      => 'product',
             'posts_per_page' => -1,
-            'meta_key' => WP_DUMMY_CONTENT_FILLER_META_KEY,
-            'meta_value' => '1',
-            'fields' => 'ids',
-            'post_status' => 'any',
+            'meta_key'       => WP_DUMMY_CONTENT_FILLER_META_KEY,
+            'meta_value'     => '1',
+            'fields'         => 'ids',
+            'post_status'    => 'any',
         ];
 
         $dummy_products = get_posts($args);
-        $deleted_count = 0;
+        $deleted_count  = 0;
 
         foreach ($dummy_products as $product_id) {
             // Force delete the product (bypass trash)
@@ -977,26 +1133,30 @@ class WP_Dummy_Content_Filler_Products
         }
 
         // Clean up dummy taxonomy terms
-        $this->cleanup_dummy_product_terms();
+        $this->mc_cleanup_dummy_product_terms();
 
         return $deleted_count;
     }
 
     /**
      * Cleanup dummy product taxonomy terms
+     *
+     * @since 1.0.0
+     * @access private
+     * @return void
      */
-    private function cleanup_dummy_product_terms()
+    private function mc_cleanup_dummy_product_terms()
     {
         $taxonomies = ['product_cat', 'product_tag', 'product_visibility', 'product_shipping_class'];
 
         foreach ($taxonomies as $taxonomy) {
             // Get all terms with our dummy marker
             $terms = get_terms([
-                'taxonomy' => $taxonomy,
-                'meta_key' => WP_DUMMY_CONTENT_FILLER_META_KEY,
-                'meta_value' => '1',
-                'hide_empty' => false,
-                'fields' => 'ids',
+                'taxonomy'     => $taxonomy,
+                'meta_key'     => WP_DUMMY_CONTENT_FILLER_META_KEY,
+                'meta_value'   => '1',
+                'hide_empty'   => false,
+                'fields'       => 'ids',
             ]);
 
             if (!is_wp_error($terms) && !empty($terms)) {
@@ -1007,15 +1167,21 @@ class WP_Dummy_Content_Filler_Products
         }
     }
 
-
-    public function ajax_get_product_meta()
+    /**
+     * AJAX handler for getting product meta fields
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
+     */
+    public function mc_ajax_get_product_meta()
     {
         if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['nonce'], 'wpdcf_ajax_nonce')) {
             wp_die('Unauthorized');
         }
 
-        $meta_keys = $this->get_product_meta_keys();
-        $taxonomies = $this->get_product_taxonomies();
+        $meta_keys  = $this->mc_get_product_meta_keys();
+        $taxonomies = $this->mc_get_product_taxonomies();
 
         ob_start();
         ?>
@@ -1030,8 +1196,8 @@ class WP_Dummy_Content_Filler_Products
                             <?php
                             $authors = get_users([
                                 'role__in' => ['administrator', 'editor', 'author'],
-                                'orderby' => 'display_name',
-                                'order' => 'ASC',
+                                'orderby'  => 'display_name',
+                                'order'    => 'ASC',
                             ]);
                             foreach ($authors as $author) {
                                 echo '<option value="' . esc_attr($author->ID) . '">' .
@@ -1099,7 +1265,7 @@ class WP_Dummy_Content_Filler_Products
                         <?php foreach ($taxonomies as $taxonomy_slug => $taxonomy_label):
                             // For product_brand, only show 1 term assignment option
                             $assign_default = ($taxonomy_slug === 'product_brand') ? 1 : 2;
-                            $max_assign = ($taxonomy_slug === 'product_brand') ? 1 : 10;
+                            $max_assign     = ($taxonomy_slug === 'product_brand') ? 1 : 10;
                             ?>
                             <tr>
                                 <td>
@@ -1138,32 +1304,32 @@ class WP_Dummy_Content_Filler_Products
                     <tbody>
                         <?php
                         $faker_types = [
-                            'text' => 'Text (Sentence)',
+                            'text'       => 'Text (Sentence)',
                             'paragraphs' => 'Text (Paragraphs)',
-                            'words' => 'Text (Words)',
-                            'name' => 'Name',
-                            'email' => 'Email',
-                            'phone' => 'Phone Number',
-                            'address' => 'Address',
-                            'city' => 'City',
-                            'country' => 'Country',
-                            'zipcode' => 'ZIP Code',
-                            'number' => 'Number (1-100)',
-                            'price' => 'Price (10-1000)',
-                            'date' => 'Date',
-                            'boolean' => 'Boolean (Yes/No)',
-                            'url' => 'URL',
-                            'image_url' => 'Image URL',
-                            'color' => 'Color',
-                            'hex_color' => 'Hex Color',
-                            'latitude' => 'Latitude',
-                            'longitude' => 'Longitude',
-                            'company' => 'Company Name',
-                            '' => 'Leave Empty',  // Add Leave Empty option
+                            'words'      => 'Text (Words)',
+                            'name'       => 'Name',
+                            'email'      => 'Email',
+                            'phone'      => 'Phone Number',
+                            'address'    => 'Address',
+                            'city'       => 'City',
+                            'country'    => 'Country',
+                            'zipcode'    => 'ZIP Code',
+                            'number'     => 'Number (1-100)',
+                            'price'      => 'Price (10-1000)',
+                            'date'       => 'Date',
+                            'boolean'    => 'Boolean (Yes/No)',
+                            'url'        => 'URL',
+                            'image_url'  => 'Image URL',
+                            'color'      => 'Color',
+                            'hex_color'  => 'Hex Color',
+                            'latitude'   => 'Latitude',
+                            'longitude'  => 'Longitude',
+                            'company'    => 'Company Name',
+                            ''           => 'Leave Empty',  // Add Leave Empty option
                         ];
 
                         foreach ($meta_keys as $meta_key => $field_label):
-                            $default_type = $this->get_default_field_type($meta_key);
+                            $default_type = $this->mc_get_default_field_type($meta_key);
                             ?>
                             <tr>
                                 <td>
@@ -1198,61 +1364,64 @@ class WP_Dummy_Content_Filler_Products
                 <p class="description">No custom fields found for products.</p>
             <?php endif; ?>
 
-            <h3>Available Product Data</h3>
-            <p class="description">
-                <strong><?php echo count($this->get_available_product_data()); ?></strong> product records are available from
-                the imported data.
-                Products will be generated using this data when available.
-            </p>
         </div>
         <?php
         wp_send_json_success(ob_get_clean());
     }
 
-
-
-    private function get_default_field_type($meta_key)
+    /**
+     * Get default field type based on meta key
+     *
+     * @since 1.0.0
+     * @access private
+     * @param string $meta_key Meta key
+     * @return string Default faker type
+     */
+    private function mc_get_default_field_type($meta_key)
     {
         $mappings = [
-            '_price' => 'price',
-            '_regular_price' => 'price',
-            '_sale_price' => 'price',
-            '_stock' => 'number',
-            '_weight' => 'number',
-            '_length' => 'number',
-            '_width' => 'number',
-            '_height' => 'number',
-            '_sku' => 'text',
-            '_purchase_note' => 'text',
-            '_tax_status' => 'text',
-            '_tax_class' => 'text',
-            '_visibility' => 'text',
-            '_backorders' => 'boolean',
-            '_sold_individually' => 'boolean',
-            '_virtual' => 'boolean',
-            '_downloadable' => 'boolean',
-            '_featured' => 'boolean',
-            '_manage_stock' => 'boolean',
+            '_price'              => 'price',
+            '_regular_price'      => 'price',
+            '_sale_price'         => 'price',
+            '_stock'              => 'number',
+            '_weight'             => 'number',
+            '_length'             => 'number',
+            '_width'              => 'number',
+            '_height'             => 'number',
+            '_sku'                => 'text',
+            '_purchase_note'      => 'text',
+            '_tax_status'         => 'text',
+            '_tax_class'          => 'text',
+            '_visibility'         => 'text',
+            '_backorders'         => 'boolean',
+            '_sold_individually'  => 'boolean',
+            '_virtual'            => 'boolean',
+            '_downloadable'       => 'boolean',
+            '_featured'           => 'boolean',
+            '_manage_stock'       => 'boolean',
         ];
 
         return $mappings[$meta_key] ?? '';
     }
 
-
     /**
-     * AJAX: Get dummy products list
+     * AJAX handler for getting dummy products list
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
      */
-    public function ajax_get_dummy_products()
+    public function mc_ajax_get_dummy_products()
     {
         if (!current_user_can('manage_options')) {
             wp_die('Unauthorized');
         }
 
         $args = [
-            'post_type' => 'product',
+            'post_type'      => 'product',
             'posts_per_page' => 50,
-            'meta_key' => WP_DUMMY_CONTENT_FILLER_META_KEY,
-            'meta_value' => '1',
+            'meta_key'       => WP_DUMMY_CONTENT_FILLER_META_KEY,
+            'meta_value'     => '1',
         ];
 
         $dummy_products = get_posts($args);
@@ -1280,9 +1449,9 @@ class WP_Dummy_Content_Filler_Products
             <tbody>
                 <?php foreach ($dummy_products as $product):
                     $product_obj = wc_get_product($product->ID);
-                    $price = $product_obj ? $product_obj->get_price_html() : 'N/A';
-                    $sku = $product_obj ? $product_obj->get_sku() : 'N/A';
-                    $stock = $product_obj ? $product_obj->get_stock_status() : 'N/A';
+                    $price       = $product_obj ? $product_obj->get_price_html() : 'N/A';
+                    $sku         = $product_obj ? $product_obj->get_sku() : 'N/A';
+                    $stock       = $product_obj ? $product_obj->get_stock_status() : 'N/A';
 
                     $categories = wp_get_post_terms($product->ID, 'product_cat', ['fields' => 'names']);
                     ?>
@@ -1317,8 +1486,12 @@ class WP_Dummy_Content_Filler_Products
 
     /**
      * Render products page
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
      */
-    public function render_products_page()
+    public function mc_render_products_page()
     {
         if (!class_exists('WooCommerce')) {
             echo '<div class="wrap"><h1>WooCommerce Products</h1>';
@@ -1327,7 +1500,7 @@ class WP_Dummy_Content_Filler_Products
             return;
         }
 
-        $available_data = $this->get_available_product_data();
+        $available_data = $this->mc_get_available_product_data();
         ?>
         <div class="wrap wp-dummy-content-filler">
             <h1>Dummy Content Filler - WooCommerce Products</h1>
@@ -1352,8 +1525,8 @@ class WP_Dummy_Content_Filler_Products
                         <tr>
                             <th scope="row">Number of Products</th>
                             <td>
-                                <input type="number" name="product_count" min="1" max="50" value="5">
-                                <p class="description">Maximum 50 products at a time</p>
+                                <input type="number" name="product_count" min="1" max="100" value="5">
+                                <p class="description">Maximum 100 products at a time</p>
                             </td>
                         </tr>
                     </table>

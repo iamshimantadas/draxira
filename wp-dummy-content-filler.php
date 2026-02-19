@@ -35,10 +35,10 @@ require_once WP_DUMMY_CONTENT_FILLER_PLUGIN_DIR . 'includes/class-wp-dummy-conte
 
 // Initialize plugin
 add_action('plugins_loaded', function () {
-    WP_Dummy_Content_Filler::get_instance();
+    WP_Dummy_Content_Filler::mc_get_instance();
 
     // if woocommerce enable
     if (class_exists('WooCommerce')) {
-        WP_Dummy_Content_Filler_Products::get_instance();
+        WP_Dummy_Content_Filler_Products::mc_get_instance();
     }
 });

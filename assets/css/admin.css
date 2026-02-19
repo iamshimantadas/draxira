@@ -1,3 +1,19 @@
+/**
+ * WP Dummy Content Filler - Admin Styles
+ * 
+ * Styles for the admin interface of the dummy content generation plugin.
+ * Includes tab styling, form layouts, table designs, and notification styles.
+ *
+ * @package WP_Dummy_Content_Filler
+ * @subpackage Assets
+ * @since 1.0.0
+ * @author Shimanta Das
+ * @copyright 2026 Microcodes
+ */
+
+/**
+ * Tab content containers
+ */
 .wp-dummy-content-filler .tab-content {
     display: none;
     margin-top: 20px;
@@ -12,6 +28,13 @@
     display: block;
 }
 
+.nav-tab-wrapper {
+    margin-bottom: 0;
+}
+
+/**
+ * Danger button for delete actions
+ */
 .button-danger {
     background: #d63638 !important;
     border-color: #d63638 !important;
@@ -76,6 +99,7 @@
     margin-top: 10px;
 }
 
+
 #delete-section {
     padding: 20px;
     background: #fff3cd;
@@ -84,21 +108,19 @@
     margin-top: 20px;
 }
 
-.nav-tab-wrapper {
-    margin-bottom: 0;
-}
-
 .dashicons-format-image {
     color: #2271b1;
     vertical-align: middle;
     margin-left: 5px;
 }
 
+
 .loading {
     text-align: center;
     padding: 40px;
     color: #666;
 }
+
 
 .error {
     color: #d63638;
@@ -121,6 +143,7 @@ code {
     margin: 5px 0 15px 0;
 }
 
+
 .widefat th,
 .widefat td {
     vertical-align: middle;
@@ -135,6 +158,22 @@ code {
     min-width: 200px;
 }
 
+.form-table th {
+    width: 200px;
+}
+
+
 .notice {
     margin: 20px 0 0 0;
+}
+
+
+@media screen and (max-width: 782px) {
+    .form-table th {
+        width: auto;
+    }
+    
+    .widefat select {
+        max-width: 100%;
+    }
 }

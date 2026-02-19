@@ -1,39 +1,81 @@
 <?php
 /**
- * Main plugin class
+ * Main plugin class for WP Dummy Content Filler
+ * 
+ * @package WP_Dummy_Content_Filler
+ * @subpackage Includes
+ * @since 1.0.0
+ */
+
+/**
+ * Class WP_Dummy_Content_Filler
+ * 
+ * Handles all dummy content generation for posts, pages, and custom post types
+ * 
+ * @since 1.0.0
+ * @access public
  */
 class WP_Dummy_Content_Filler
 {
 
+    /**
+     * Singleton instance of the class
+     *
+     * @since 1.0.0
+     * @access private
+     * @var WP_Dummy_Content_Filer|null
+     */
     private static $instance = null;
+
+    /**
+     * Faker instance for generating dummy data
+     *
+     * @since 1.0.0
+     * @access private
+     * @var Faker\Generator|null
+     */
     private $faker = null;
 
-    // Available Faker data types
+    /**
+     * Available Faker data types for user selection
+     *
+     * @since 1.0.0
+     * @access private
+     * @var array
+     */
     private $faker_types = [
-        'text' => 'Text (Sentence)',
+        'text'       => 'Text (Sentence)',
         'paragraphs' => 'Text (Paragraphs)',
-        'words' => 'Text (Words)',
-        'name' => 'Name',
-        'email' => 'Email',
-        'phone' => 'Phone Number',
-        'address' => 'Address',
-        'city' => 'City',
-        'country' => 'Country',
-        'zipcode' => 'ZIP Code',
-        'number' => 'Number (1-100)',
-        'price' => 'Price (10-1000)',
-        'date' => 'Date',
-        'boolean' => 'Boolean (Yes/No)',
-        'url' => 'URL',
-        'image_url' => 'Image URL',
-        'color' => 'Color',
-        'hex_color' => 'Hex Color',
-        'latitude' => 'Latitude',
-        'longitude' => 'Longitude',
-        'company' => 'Company Name',
+        'words'      => 'Text (Words)',
+        'name'       => 'Name',
+        'email'      => 'Email',
+        'phone'      => 'Phone Number',
+        'address'    => 'Address',
+        'city'       => 'City',
+        'country'    => 'Country',
+        'zipcode'    => 'ZIP Code',
+        'number'     => 'Number (1-100)',
+        'price'      => 'Price (10-1000)',
+        'date'       => 'Date',
+        'boolean'    => 'Boolean (Yes/No)',
+        'url'        => 'URL',
+        'image_url'  => 'Image URL',
+        'color'      => 'Color',
+        'hex_color'  => 'Hex Color',
+        'latitude'   => 'Latitude',
+        'longitude'  => 'Longitude',
+        'company'    => 'Company Name',
     ];
 
-    public static function get_instance()
+    /**
+     * Get singleton instance of the class
+     *
+     * @since 1.0.0
+     * @access public
+     * @static
+     * @return WP_Dummy_Content_Filler Singleton instance
+     */
+    public static function mc_get_instance()
     {
         if (null === self::$instance) {
             self::$instance = new self();
@@ -41,39 +83,61 @@ class WP_Dummy_Content_Filler
         return self::$instance;
     }
 
+    /**
+     * Constructor - Private to enforce singleton pattern
+     *
+     * @since 1.0.0
+     * @access private
+     */
     private function __construct()
     {
-        $this->init_hooks();
+        $this->mc_init_hooks();
     }
 
-    private function init_hooks()
+    /**
+     * Initialize all WordPress hooks
+     *
+     * @since 1.0.0
+     * @access private
+     * @return void
+     */
+    private function mc_init_hooks()
     {
         // Admin menu
-        add_action('admin_menu', [$this, 'add_admin_menu']);
+        add_action('admin_menu', [$this, 'mc_add_admin_menu']);
 
         // Handle form submissions
-        add_action('admin_init', [$this, 'handle_actions']);
+        add_action('admin_init', [$this, 'mc_handle_actions']);
 
         // Enqueue scripts
-        add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
+        add_action('admin_enqueue_scripts', [$this, 'mc_enqueue_admin_scripts']);
 
         // AJAX handlers
-        add_action('wp_ajax_wpdcf_get_post_meta', [$this, 'ajax_get_post_meta']);
-        add_action('wp_ajax_wpdcf_get_dummy_posts', [$this, 'ajax_get_dummy_posts']);
-        add_action('wp_ajax_wpdcf_get_authors', [$this, 'ajax_get_authors']);
+        add_action('wp_ajax_wpdcf_get_post_meta', [$this, 'mc_ajax_get_post_meta']);
+        add_action('wp_ajax_wpdcf_get_dummy_posts', [$this, 'mc_ajax_get_dummy_posts']);
+        add_action('wp_ajax_wpdcf_get_authors', [$this, 'mc_ajax_get_authors']);
 
         // Cleanup hooks for permanent deletion
-        add_action('before_delete_post', [$this, 'cleanup_post_meta'], 10, 1);
-        add_action('deleted_user', [$this, 'cleanup_user_meta'], 10, 2);
+        add_action('before_delete_post', [$this, 'mc_cleanup_post_meta'], 10, 1);
+        add_action('deleted_user', [$this, 'mc_cleanup_user_meta'], 10, 2);
 
         if (class_exists('WooCommerce')) {
-            add_action('admin_menu', [$this, 'add_products_menu'], 11);
+            add_action('admin_menu', [$this, 'mc_add_products_menu'], 11);
         }
+        
         // Exclude products from post types
-        add_action('admin_init', [$this, 'exclude_products_from_post_types']);
+        add_action('admin_init', [$this, 'mc_exclude_products_from_post_types']);
     }
 
-    public function enqueue_admin_scripts($hook)
+    /**
+     * Enqueue admin scripts and styles
+     *
+     * @since 1.0.0
+     * @access public
+     * @param string $hook Current admin page hook
+     * @return void
+     */
+    public function mc_enqueue_admin_scripts($hook)
     {
         if (strpos($hook, 'wp-dummy-content-filler') !== false) {
             wp_enqueue_script(
@@ -91,23 +155,30 @@ class WP_Dummy_Content_Filler
                 WP_DUMMY_CONTENT_FILLER_VERSION
             );
 
-            // Localize script
+            // Localize script for AJAX
             wp_localize_script('wp-dummy-content-filler-admin', 'wpdcf_ajax', [
                 'ajax_url' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('wpdcf_ajax_nonce')
+                'nonce'    => wp_create_nonce('wpdcf_ajax_nonce')
             ]);
         }
     }
 
-    public function add_admin_menu()
+    /**
+     * Add main menu and post types submenu
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
+     */
+    public function mc_add_admin_menu()
     {
         add_menu_page(
             'WP Dummy Content Filler',
             'Dummy Content',
             'manage_options',
             'wp-dummy-content-filler',
-            [$this, 'render_post_types_page'],
-            'dashicons-edit',
+            [$this, 'mc_render_post_types_page'],
+            WP_DUMMY_CONTENT_FILLER_PLUGIN_URL . 'assets/icon/icon.png',
             30
         );
 
@@ -117,7 +188,7 @@ class WP_Dummy_Content_Filler
             'Post Types',
             'manage_options',
             'wp-dummy-content-filler',
-            [$this, 'render_post_types_page']
+            [$this, 'mc_render_post_types_page']
         );
 
         add_submenu_page(
@@ -126,12 +197,18 @@ class WP_Dummy_Content_Filler
             'Users',
             'manage_options',
             'wp-dummy-content-filler-users',
-            [$this, 'render_users_page']
+            [$this, 'mc_render_users_page']
         );
-
     }
 
-    public function add_products_menu()
+    /**
+     * Add products submenu (WooCommerce specific)
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
+     */
+    public function mc_add_products_menu()
     {
         add_submenu_page(
             'wp-dummy-content-filler',
@@ -139,21 +216,25 @@ class WP_Dummy_Content_Filler
             'Products',
             'manage_options',
             'wp-dummy-content-filler-products',
-            [WP_Dummy_Content_Filler_Products::get_instance(), 'render_products_page']
+            [WP_Dummy_Content_Filler_Products::mc_get_instance(), 'mc_render_products_page']
         );
     }
 
     /**
      * Handle form submissions and clear actions
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
      */
-    public function handle_actions()
+    public function mc_handle_actions()
     {
         if (!current_user_can('manage_options')) {
             return;
         }
 
         if (isset($_POST['generate_posts']) && wp_verify_nonce($_POST['_wpnonce'] ?? '', 'generate_dummy_posts')) {
-            $this->generate_dummy_posts();
+            $this->mc_generate_dummy_posts();
         }
 
         $clear_posts_nonce_action = 'clear_dummy_posts';
@@ -165,13 +246,13 @@ class WP_Dummy_Content_Filler
                 if (!in_array($post_type, get_post_types(['public' => true]), true)) {
                     set_transient('dummy_content_results', [
                         'message' => 'Invalid post type selected.',
-                        'type' => 'error'
+                        'type'    => 'error'
                     ], 45);
                     wp_safe_redirect(admin_url('admin.php?page=wp-dummy-content-filler'));
                     exit;
                 }
 
-                $deleted_count = $this->clear_dummy_posts($post_type);
+                $deleted_count = $this->mc_clear_dummy_posts($post_type);
 
                 set_transient('dummy_content_results', [
                     'message' => sprintf(
@@ -188,13 +269,13 @@ class WP_Dummy_Content_Filler
         }
 
         if (isset($_POST['generate_users']) && wp_verify_nonce($_POST['_wpnonce'] ?? '', 'generate_dummy_users')) {
-            $this->generate_dummy_users();
+            $this->mc_generate_dummy_users();
         }
 
         $clear_users_nonce_action = 'clear_dummy_users';
         if (wp_verify_nonce($_REQUEST['_wpnonce'] ?? '', $clear_users_nonce_action)) {
             if (isset($_REQUEST['clear_dummy_users'])) {
-                $deleted_count = $this->clear_dummy_users();
+                $deleted_count = $this->mc_clear_dummy_users();
 
                 set_transient('dummy_user_results', [
                     'message' => sprintf(
@@ -211,7 +292,14 @@ class WP_Dummy_Content_Filler
         }
     }
 
-    private function get_faker()
+    /**
+     * Get Faker instance (initialize if not exists)
+     *
+     * @since 1.0.0
+     * @access private
+     * @return Faker\Generator|false Faker instance or false if not available
+     */
+    private function mc_get_faker()
     {
         if (null === $this->faker) {
             // Check if Faker is available via Composer
@@ -225,13 +313,20 @@ class WP_Dummy_Content_Filler
         return $this->faker;
     }
 
-    private function generate_dummy_posts()
+    /**
+     * Generate dummy posts based on form submission
+     *
+     * @since 1.0.0
+     * @access private
+     * @return void
+     */
+    private function mc_generate_dummy_posts()
     {
-        $post_type = sanitize_text_field($_POST['post_type'] ?? 'post');
-        $count = intval($_POST['post_count'] ?? 5);
-        $with_images = isset($_POST['with_images']);
+        $post_type      = sanitize_text_field($_POST['post_type'] ?? 'post');
+        $count          = intval($_POST['post_count'] ?? 5);
+        $with_images    = isset($_POST['with_images']);
         $create_excerpt = isset($_POST['create_excerpt']);
-        $post_author = intval($_POST['post_author'] ?? get_current_user_id());
+        $post_author    = intval($_POST['post_author'] ?? get_current_user_id());
 
         // Get post meta configurations
         $post_meta_config = [];
@@ -265,7 +360,7 @@ class WP_Dummy_Content_Filler
         if (!empty($taxonomy_config)) {
             foreach ($taxonomy_config as $taxonomy => $config) {
                 // Always create 10 terms for each taxonomy that has create enabled
-                $terms = $this->create_dummy_terms($taxonomy, 10); // Always create 10 terms
+                $terms = $this->mc_create_dummy_terms($taxonomy, 10);
                 $created_terms[$taxonomy] = $terms;
                 $results['taxonomies_created'] += count($terms);
             }
@@ -273,7 +368,15 @@ class WP_Dummy_Content_Filler
 
         // Generate posts
         for ($i = 0; $i < $count; $i++) {
-            $post_id = $this->create_dummy_post($post_type, $with_images, $create_excerpt, $post_author, $post_meta_config, $created_terms, $taxonomy_config);
+            $post_id = $this->mc_create_dummy_post(
+                $post_type, 
+                $with_images, 
+                $create_excerpt, 
+                $post_author, 
+                $post_meta_config, 
+                $created_terms, 
+                $taxonomy_config
+            );
 
             if ($post_id && !is_wp_error($post_id)) {
                 $results['success']++;
@@ -297,9 +400,30 @@ class WP_Dummy_Content_Filler
         exit;
     }
 
-    private function create_dummy_post($post_type = 'post', $with_images = false, $create_excerpt = false, $post_author = 0, $meta_config = [], $created_terms = [], $taxonomy_config = [])
-    {
-        $faker = $this->get_faker();
+    /**
+     * Create a single dummy post
+     *
+     * @since 1.0.0
+     * @access private
+     * @param string $post_type      Post type slug
+     * @param bool   $with_images    Whether to add featured image
+     * @param bool   $create_excerpt Whether to create excerpt
+     * @param int    $post_author    Author ID
+     * @param array  $meta_config    Meta field configurations
+     * @param array  $created_terms  Created taxonomy terms
+     * @param array  $taxonomy_config Taxonomy configurations
+     * @return int|false Post ID on success, false on failure
+     */
+    private function mc_create_dummy_post(
+        $post_type = 'post', 
+        $with_images = false, 
+        $create_excerpt = false, 
+        $post_author = 0, 
+        $meta_config = [], 
+        $created_terms = [], 
+        $taxonomy_config = []
+    ) {
+        $faker = $this->mc_get_faker();
 
         // Use current user if no author specified or author is invalid
         if (!$post_author || !get_user_by('id', $post_author)) {
@@ -307,11 +431,11 @@ class WP_Dummy_Content_Filler
         }
 
         $post_data = [
-            'post_title' => $faker ? $faker->sentence(6) : 'Dummy Post ' . time() . ' ' . wp_rand(1000, 9999),
+            'post_title'   => $faker ? $faker->sentence(6) : 'Dummy Post ' . time() . ' ' . wp_rand(1000, 9999),
             'post_content' => $faker ? $faker->paragraphs(3, true) : 'This is dummy content for testing purposes.',
-            'post_status' => 'publish',
-            'post_type' => $post_type,
-            'post_author' => $post_author,
+            'post_status'  => 'publish',
+            'post_type'    => $post_type,
+            'post_author'  => $post_author,
         ];
 
         // Add excerpt if requested
@@ -327,7 +451,7 @@ class WP_Dummy_Content_Filler
 
             // Add featured image if requested
             if ($with_images) {
-                $this->attach_featured_image($post_id);
+                $this->mc_attach_featured_image($post_id);
             }
 
             // Assign taxonomies
@@ -351,7 +475,7 @@ class WP_Dummy_Content_Filler
 
             // Add configured post meta
             foreach ($meta_config as $meta_key => $config) {
-                $meta_value = $this->generate_faker_value($config['type']);
+                $meta_value = $this->mc_generate_faker_value($config['type']);
                 if ($meta_value !== '') {
                     update_post_meta($post_id, $meta_key, $meta_value);
                 }
@@ -361,24 +485,33 @@ class WP_Dummy_Content_Filler
         return $post_id;
     }
 
-    private function create_dummy_terms($taxonomy, $count = 10)
+    /**
+     * Create dummy taxonomy terms
+     *
+     * @since 1.0.0
+     * @access private
+     * @param string $taxonomy Taxonomy slug
+     * @param int    $count    Number of terms to create
+     * @return array Array of created term IDs
+     */
+    private function mc_create_dummy_terms($taxonomy, $count = 10)
     {
-        $faker = $this->get_faker();
+        $faker = $this->mc_get_faker();
         $created_terms = [];
 
         // Get existing terms to avoid duplicates
         $existing_terms = get_terms([
-            'taxonomy' => $taxonomy,
+            'taxonomy'   => $taxonomy,
             'hide_empty' => false,
-            'fields' => 'names'
+            'fields'     => 'names'
         ]);
 
         if (is_wp_error($existing_terms)) {
             $existing_terms = [];
         }
 
-        $created = 0;
-        $attempts = 0;
+        $created      = 0;
+        $attempts     = 0;
         $max_attempts = $count * 3; // Prevent infinite loop
 
         while ($created < $count && $attempts < $max_attempts) {
@@ -405,7 +538,7 @@ class WP_Dummy_Content_Filler
             $term_slug = sanitize_title($term_name . '-' . wp_rand(100, 999));
 
             $term = wp_insert_term($term_name, $taxonomy, [
-                'slug' => $term_slug,
+                'slug'        => $term_slug,
                 'description' => $faker ? $faker->sentence() : 'Dummy term description'
             ]);
 
@@ -422,9 +555,17 @@ class WP_Dummy_Content_Filler
         return $created_terms;
     }
 
-    private function generate_faker_value($type)
+    /**
+     * Generate value using Faker based on type
+     *
+     * @since 1.0.0
+     * @access private
+     * @param string $type Faker data type
+     * @return string|int|float Generated value
+     */
+    private function mc_generate_faker_value($type)
     {
-        $faker = $this->get_faker();
+        $faker = $this->mc_get_faker();
 
         if (!$faker) {
             return '';
@@ -478,7 +619,15 @@ class WP_Dummy_Content_Filler
         }
     }
 
-    private function attach_featured_image($post_id)
+    /**
+     * Attach featured image to post from plugin assets
+     *
+     * @since 1.0.0
+     * @access private
+     * @param int $post_id Post ID
+     * @return bool True on success, false on failure
+     */
+    private function mc_attach_featured_image($post_id)
     {
         $image_dir = WP_DUMMY_CONTENT_FILLER_PLUGIN_DIR . 'assets/img/';
 
@@ -493,7 +642,7 @@ class WP_Dummy_Content_Filler
         }
 
         $random_image = $images[array_rand($images)];
-        $filename = basename($random_image);
+        $filename     = basename($random_image);
 
         // Check if image already exists in media library
         $existing_image = get_page_by_title($filename, OBJECT, 'attachment');
@@ -510,9 +659,9 @@ class WP_Dummy_Content_Filler
             $wp_filetype = wp_check_filetype($filename, null);
             $attachment = [
                 'post_mime_type' => $wp_filetype['type'],
-                'post_title' => preg_replace('/\.[^.]+$/', '', $filename),
-                'post_content' => '',
-                'post_status' => 'inherit'
+                'post_title'     => preg_replace('/\.[^.]+$/', '', $filename),
+                'post_content'   => '',
+                'post_status'    => 'inherit'
             ];
 
             $attachment_id = wp_insert_attachment($attachment, $upload_file['file']);
@@ -529,7 +678,15 @@ class WP_Dummy_Content_Filler
         return false;
     }
 
-    private function get_post_meta_keys($post_type = 'post')
+    /**
+     * Get post meta keys for a specific post type
+     *
+     * @since 1.0.0
+     * @access private
+     * @param string $post_type Post type slug
+     * @return array Array of meta keys with labels
+     */
+    private function mc_get_post_meta_keys($post_type = 'post')
     {
         // Skip if this is a product post type
         if ($post_type === 'product') {
@@ -538,7 +695,7 @@ class WP_Dummy_Content_Filler
 
         $meta_keys = [];
 
-        //  Check for ACF fields
+        // Check for ACF fields
         if (function_exists('acf_get_field_groups')) {
             $field_groups = acf_get_field_groups(['post_type' => $post_type]);
             foreach ($field_groups as $field_group) {
@@ -553,7 +710,7 @@ class WP_Dummy_Content_Filler
             }
         }
 
-        //  Check for CMB2 fields
+        // Check for CMB2 fields
         if (class_exists('CMB2')) {
             $cmb2_boxes = CMB2_Boxes::get_all();
             foreach ($cmb2_boxes as $cmb_id => $cmb) {
@@ -574,7 +731,15 @@ class WP_Dummy_Content_Filler
         return $meta_keys;
     }
 
-    private function get_post_taxonomies($post_type = 'post')
+    /**
+     * Get post taxonomies for a specific post type
+     *
+     * @since 1.0.0
+     * @access private
+     * @param string $post_type Post type slug
+     * @return array Array of taxonomies with labels
+     */
+    private function mc_get_post_taxonomies($post_type = 'post')
     {
         $taxonomies = get_object_taxonomies($post_type, 'objects');
         $available_taxonomies = [];
@@ -590,13 +755,17 @@ class WP_Dummy_Content_Filler
 
     /**
      * Get all available authors for post assignment
+     *
+     * @since 1.0.0
+     * @access private
+     * @return array Array of authors with ID as key and name as value
      */
-    private function get_authors()
+    private function mc_get_authors()
     {
         $authors = get_users([
             'role__in' => ['administrator', 'editor', 'author'],
-            'orderby' => 'display_name',
-            'order' => 'ASC',
+            'orderby'  => 'display_name',
+            'order'    => 'ASC',
         ]);
 
         $author_list = [];
@@ -609,21 +778,26 @@ class WP_Dummy_Content_Filler
 
     /**
      * Delete dummy posts and their associated meta data
+     *
+     * @since 1.0.0
+     * @access private
+     * @param string $post_type Post type slug
+     * @return int Number of deleted posts
      */
-    private function clear_dummy_posts($post_type = 'post')
+    private function mc_clear_dummy_posts($post_type = 'post')
     {
         global $wpdb;
 
         $args = [
-            'post_type' => $post_type,
+            'post_type'      => $post_type,
             'posts_per_page' => -1,
-            'meta_key' => WP_DUMMY_CONTENT_FILLER_META_KEY,
-            'meta_value' => '1',
-            'fields' => 'ids',
-            'post_status' => 'any', // Include all statuses
+            'meta_key'       => WP_DUMMY_CONTENT_FILLER_META_KEY,
+            'meta_value'     => '1',
+            'fields'         => 'ids',
+            'post_status'    => 'any', // Include all statuses
         ];
 
-        $dummy_posts = get_posts($args);
+        $dummy_posts   = get_posts($args);
         $deleted_count = 0;
 
         foreach ($dummy_posts as $post_id) {
@@ -636,7 +810,7 @@ class WP_Dummy_Content_Filler
         }
 
         // Clean up dummy taxonomy terms
-        $this->cleanup_dummy_terms($post_type);
+        $this->mc_cleanup_dummy_terms($post_type);
 
         return $deleted_count;
     }
@@ -644,8 +818,13 @@ class WP_Dummy_Content_Filler
     /**
      * Cleanup post meta when a post is deleted
      * This hook ensures all meta is deleted even if deletion happens outside our plugin
+     *
+     * @since 1.0.0
+     * @access public
+     * @param int $post_id Post ID
+     * @return void
      */
-    public function cleanup_post_meta($post_id)
+    public function mc_cleanup_post_meta($post_id)
     {
         global $wpdb;
 
@@ -667,8 +846,12 @@ class WP_Dummy_Content_Filler
 
     /**
      * Cleanup orphaned post meta (safety measure)
+     *
+     * @since 1.0.0
+     * @access private
+     * @return void
      */
-    private function cleanup_orphaned_post_meta()
+    private function mc_cleanup_orphaned_post_meta()
     {
         global $wpdb;
 
@@ -682,19 +865,24 @@ class WP_Dummy_Content_Filler
 
     /**
      * Cleanup dummy taxonomy terms for a post type
+     *
+     * @since 1.0.0
+     * @access private
+     * @param string $post_type Post type slug
+     * @return void
      */
-    private function cleanup_dummy_terms($post_type = 'post')
+    private function mc_cleanup_dummy_terms($post_type = 'post')
     {
         $taxonomies = get_object_taxonomies($post_type);
 
         foreach ($taxonomies as $taxonomy) {
             // Get all terms with our dummy marker
             $terms = get_terms([
-                'taxonomy' => $taxonomy,
-                'meta_key' => WP_DUMMY_CONTENT_FILLER_META_KEY,
-                'meta_value' => '1',
-                'hide_empty' => false,
-                'fields' => 'ids',
+                'taxonomy'     => $taxonomy,
+                'meta_key'     => WP_DUMMY_CONTENT_FILLER_META_KEY,
+                'meta_value'   => '1',
+                'hide_empty'   => false,
+                'fields'       => 'ids',
             ]);
 
             if (!is_wp_error($terms) && !empty($terms)) {
@@ -708,56 +896,60 @@ class WP_Dummy_Content_Filler
     /**
      * Get all available user meta keys including defaults and custom fields
      * Filters out WordPress internal meta fields
+     *
+     * @since 1.0.0
+     * @access private
+     * @return array Array of user meta keys with labels
      */
-    private function get_user_meta_keys()
+    private function mc_get_user_meta_keys()
     {
         global $wpdb;
 
         // 1. Default WordPress user fields (from wp_users table)
         $default_user_fields = [
-            'user_login' => 'Username',
-            'user_email' => 'Email',
-            'user_url' => 'Website',
-            'display_name' => 'Display Name',
-            'description' => 'Biographical Info',
+            'user_login'    => 'Username',
+            'user_email'    => 'Email',
+            'user_url'      => 'Website',
+            'display_name'  => 'Display Name',
+            'description'   => 'Biographical Info',
         ];
 
         // 2. Default WordPress user meta fields (commonly used)
         $default_user_meta = [
-            'nickname' => 'Nickname',
-            'first_name' => 'First Name',
-            'last_name' => 'Last Name',
-            'rich_editing' => 'Visual Editor',
-            'admin_color' => 'Admin Color Scheme',
-            'show_admin_bar_front' => 'Show Toolbar',
-            'locale' => 'Language',
-            'comment_shortcuts' => 'Keyboard Shortcuts',
+            'nickname'               => 'Nickname',
+            'first_name'             => 'First Name',
+            'last_name'              => 'Last Name',
+            'rich_editing'           => 'Visual Editor',
+            'admin_color'            => 'Admin Color Scheme',
+            'show_admin_bar_front'   => 'Show Toolbar',
+            'locale'                 => 'Language',
+            'comment_shortcuts'      => 'Keyboard Shortcuts',
         ];
 
         // 3. WooCommerce fields (if available)
         $woocommerce_fields = [];
         if (class_exists('WooCommerce')) {
             $woocommerce_fields = [
-                'billing_first_name' => 'Billing First Name',
-                'billing_last_name' => 'Billing Last Name',
-                'billing_company' => 'Billing Company',
-                'billing_address_1' => 'Billing Address 1',
-                'billing_address_2' => 'Billing Address 2',
-                'billing_city' => 'Billing City',
-                'billing_postcode' => 'Billing Postcode',
-                'billing_country' => 'Billing Country',
-                'billing_state' => 'Billing State',
-                'billing_phone' => 'Billing Phone',
-                'billing_email' => 'Billing Email',
+                'billing_first_name'  => 'Billing First Name',
+                'billing_last_name'   => 'Billing Last Name',
+                'billing_company'     => 'Billing Company',
+                'billing_address_1'   => 'Billing Address 1',
+                'billing_address_2'   => 'Billing Address 2',
+                'billing_city'        => 'Billing City',
+                'billing_postcode'    => 'Billing Postcode',
+                'billing_country'     => 'Billing Country',
+                'billing_state'       => 'Billing State',
+                'billing_phone'       => 'Billing Phone',
+                'billing_email'       => 'Billing Email',
                 'shipping_first_name' => 'Shipping First Name',
-                'shipping_last_name' => 'Shipping Last Name',
-                'shipping_company' => 'Shipping Company',
-                'shipping_address_1' => 'Shipping Address 1',
-                'shipping_address_2' => 'Shipping Address 2',
-                'shipping_city' => 'Shipping City',
-                'shipping_postcode' => 'Shipping Postcode',
-                'shipping_country' => 'Shipping Country',
-                'shipping_state' => 'Shipping State',
+                'shipping_last_name'  => 'Shipping Last Name',
+                'shipping_company'    => 'Shipping Company',
+                'shipping_address_1'  => 'Shipping Address 1',
+                'shipping_address_2'  => 'Shipping Address 2',
+                'shipping_city'       => 'Shipping City',
+                'shipping_postcode'   => 'Shipping Postcode',
+                'shipping_country'    => 'Shipping Country',
+                'shipping_state'      => 'Shipping State',
             ];
         }
 
@@ -798,31 +990,31 @@ class WP_Dummy_Content_Filler
 
         // 6. Get other custom user meta keys (excluding WordPress internal fields)
         $custom_meta_keys = $wpdb->get_col("
-        SELECT DISTINCT meta_key 
-        FROM {$wpdb->usermeta} 
-        WHERE meta_key NOT LIKE '\_%' 
-        AND meta_key NOT LIKE 'closedpostboxes_%'
-        AND meta_key NOT LIKE 'metaboxhidden_%'
-        AND meta_key NOT LIKE 'meta-box-order_%'
-        AND meta_key NOT LIKE 'manage%columnshidden'
-        AND meta_key NOT IN (
-            'nickname', 'first_name', 'last_name', 'description', 'rich_editing', 
-            'comment_shortcuts', 'admin_color', 'show_admin_bar_front', 
-            'locale', 'wp_capabilities', 'wp_user_level', 'dismissed_wp_pointers',
-            'session_tokens', 'billing_%', 'shipping_%', 'last_update',
-            'nav_menu_recently_edited', 'community-events-location',
-            'dashboard_quick_press_last_post_id', 'dashboard_widget_options',
-            'show_welcome_panel', 'user-settings', 'user-settings-time',
-            'syntax_highlighting', 'elementor_%', 'woocommerce_%',
-            'woodmart_%', 'tran_%', 'trans_%', 'unreserved_%',
-            'phillip_%', 'acf_user_settings', 'elementor_introduction',
-            'last_login', 'wc_last_active', 'wishlist_%',
-            'wp_persisted_preferences', 'wp_user-settings', 'wp_user-settings-time',
-            'wp_dashboard_quick_press_last_post_id'
-        )
-        ORDER BY meta_key
-        LIMIT 100
-    ");
+            SELECT DISTINCT meta_key 
+            FROM {$wpdb->usermeta} 
+            WHERE meta_key NOT LIKE '\_%' 
+            AND meta_key NOT LIKE 'closedpostboxes_%'
+            AND meta_key NOT LIKE 'metaboxhidden_%'
+            AND meta_key NOT LIKE 'meta-box-order_%'
+            AND meta_key NOT LIKE 'manage%columnshidden'
+            AND meta_key NOT IN (
+                'nickname', 'first_name', 'last_name', 'description', 'rich_editing', 
+                'comment_shortcuts', 'admin_color', 'show_admin_bar_front', 
+                'locale', 'wp_capabilities', 'wp_user_level', 'dismissed_wp_pointers',
+                'session_tokens', 'billing_%', 'shipping_%', 'last_update',
+                'nav_menu_recently_edited', 'community-events-location',
+                'dashboard_quick_press_last_post_id', 'dashboard_widget_options',
+                'show_welcome_panel', 'user-settings', 'user-settings-time',
+                'syntax_highlighting', 'elementor_%', 'woocommerce_%',
+                'woodmart_%', 'tran_%', 'trans_%', 'unreserved_%',
+                'phillip_%', 'acf_user_settings', 'elementor_introduction',
+                'last_login', 'wc_last_active', 'wishlist_%',
+                'wp_persisted_preferences', 'wp_user-settings', 'wp_user-settings-time',
+                'wp_dashboard_quick_press_last_post_id'
+            )
+            ORDER BY meta_key
+            LIMIT 100
+        ");
 
         // 7. Format custom meta keys
         $custom_fields = [];
@@ -889,26 +1081,31 @@ class WP_Dummy_Content_Filler
 
     /**
      * Helper method to auto-select field type based on field name
+     *
+     * @since 1.0.0
+     * @access private
+     * @param string $field_name Field name to analyze
+     * @return string Recommended faker type
      */
-    private function get_auto_field_type($field_name)
+    private function mc_get_auto_field_type($field_name)
     {
         $mappings = [
             'first_name' => 'name',
-            'last_name' => 'name',
-            'nickname' => 'name',
+            'last_name'  => 'name',
+            'nickname'   => 'name',
             'display_name' => 'name',
             'description' => 'paragraphs',
-            'user_url' => 'url',
-            'email' => 'email',
-            'phone' => 'phone',
-            'address' => 'address',
-            'city' => 'city',
-            'country' => 'country',
-            'zip' => 'zipcode',
-            'postcode' => 'zipcode',
-            'company' => 'company',
-            'price' => 'price',
-            'date' => 'date',
+            'user_url'   => 'url',
+            'email'      => 'email',
+            'phone'      => 'phone',
+            'address'    => 'address',
+            'city'       => 'city',
+            'country'    => 'country',
+            'zip'        => 'zipcode',
+            'postcode'   => 'zipcode',
+            'company'    => 'company',
+            'price'      => 'price',
+            'date'       => 'date',
         ];
 
         foreach ($mappings as $key => $type) {
@@ -920,10 +1117,17 @@ class WP_Dummy_Content_Filler
         return '';
     }
 
-    private function generate_dummy_users()
+    /**
+     * Generate dummy users based on form submission
+     *
+     * @since 1.0.0
+     * @access private
+     * @return void
+     */
+    private function mc_generate_dummy_users()
     {
         $count = intval($_POST['user_count'] ?? 5);
-        $role = sanitize_text_field($_POST['user_role'] ?? 'subscriber');
+        $role  = sanitize_text_field($_POST['user_role'] ?? 'subscriber');
 
         // Get user meta configurations
         $user_meta_config = [];
@@ -938,23 +1142,23 @@ class WP_Dummy_Content_Filler
         }
 
         $results = ['success' => 0, 'failed' => 0];
-        $faker = $this->get_faker();
+        $faker   = $this->mc_get_faker();
 
         for ($i = 0; $i < $count; $i++) {
             $username = $faker ? $faker->userName : 'dummyuser_' . uniqid();
-            $email = $faker ? $faker->email : $username . '@example.com';
+            $email    = $faker ? $faker->email : $username . '@example.com';
 
             // Create user with basic data
             $userdata = [
                 'user_login' => $username,
                 'user_email' => $email,
-                'user_pass' => 'password',
-                'role' => $role,
+                'user_pass'  => 'password',
+                'role'       => $role,
             ];
 
             // Add optional user fields if configured
             foreach ($user_meta_config as $meta_key => $config) {
-                $meta_value = $this->generate_faker_value($config['type']);
+                $meta_value = $this->mc_generate_faker_value($config['type']);
                 if ($meta_value !== '') {
                     // Handle user table fields specially
                     if (in_array($meta_key, ['user_url', 'display_name', 'description'])) {
@@ -972,7 +1176,7 @@ class WP_Dummy_Content_Filler
                 // Always add first name and last name
                 if ($faker) {
                     $first_name = $faker->firstName;
-                    $last_name = $faker->lastName;
+                    $last_name  = $faker->lastName;
 
                     update_user_meta($user_id, 'first_name', $first_name);
                     update_user_meta($user_id, 'last_name', $last_name);
@@ -981,7 +1185,7 @@ class WP_Dummy_Content_Filler
                     if (!isset($userdata['display_name'])) {
                         $display_name = $faker->boolean(70) ? "$first_name $last_name" : $username;
                         wp_update_user([
-                            'ID' => $user_id,
+                            'ID'           => $user_id,
                             'display_name' => $display_name
                         ]);
                     }
@@ -989,7 +1193,7 @@ class WP_Dummy_Content_Filler
 
                 // Add configured user meta
                 foreach ($user_meta_config as $meta_key => $config) {
-                    $meta_value = $this->generate_faker_value($config['type']);
+                    $meta_value = $this->mc_generate_faker_value($config['type']);
                     if ($meta_value !== '' && !in_array($meta_key, ['user_url', 'display_name', 'description'])) {
                         update_user_meta($user_id, $meta_key, $meta_value);
                     }
@@ -1016,18 +1220,22 @@ class WP_Dummy_Content_Filler
 
     /**
      * Delete dummy users and their associated meta data
+     *
+     * @since 1.0.0
+     * @access private
+     * @return int Number of deleted users
      */
-    private function clear_dummy_users()
+    private function mc_clear_dummy_users()
     {
         global $wpdb;
 
         $args = [
-            'meta_key' => WP_DUMMY_CONTENT_FILLER_META_KEY,
+            'meta_key'   => WP_DUMMY_CONTENT_FILLER_META_KEY,
             'meta_value' => '1',
-            'fields' => 'ids',
+            'fields'     => 'ids',
         ];
 
-        $dummy_users = get_users($args);
+        $dummy_users   = get_users($args);
         $deleted_count = 0;
 
         foreach ($dummy_users as $user_id) {
@@ -1040,7 +1248,7 @@ class WP_Dummy_Content_Filler
         }
 
         // Additional cleanup: Delete orphaned user meta
-        $this->cleanup_orphaned_user_meta();
+        $this->mc_cleanup_orphaned_user_meta();
 
         return $deleted_count;
     }
@@ -1048,8 +1256,14 @@ class WP_Dummy_Content_Filler
     /**
      * Cleanup user meta when a user is deleted
      * This hook ensures all meta is deleted even if deletion happens outside our plugin
+     *
+     * @since 1.0.0
+     * @access public
+     * @param int      $user_id  User ID
+     * @param int|null $reassign Reassign posts to another user ID
+     * @return void
      */
-    public function cleanup_user_meta($user_id, $reassign = null)
+    public function mc_cleanup_user_meta($user_id, $reassign = null)
     {
         global $wpdb;
 
@@ -1071,8 +1285,12 @@ class WP_Dummy_Content_Filler
 
     /**
      * Cleanup orphaned user meta (safety measure)
+     *
+     * @since 1.0.0
+     * @access private
+     * @return void
      */
-    private function cleanup_orphaned_user_meta()
+    private function mc_cleanup_orphaned_user_meta()
     {
         global $wpdb;
 
@@ -1084,15 +1302,22 @@ class WP_Dummy_Content_Filler
         ");
     }
 
-    public function ajax_get_post_meta()
+    /**
+     * AJAX handler for getting post meta fields
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
+     */
+    public function mc_ajax_get_post_meta()
     {
         if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['nonce'], 'wpdcf_ajax_nonce')) {
             wp_die('Unauthorized');
         }
 
-        $post_type = sanitize_text_field($_POST['post_type']);
-        $meta_keys = $this->get_post_meta_keys($post_type);
-        $taxonomies = $this->get_post_taxonomies($post_type);
+        $post_type  = sanitize_text_field($_POST['post_type']);
+        $meta_keys  = $this->mc_get_post_meta_keys($post_type);
+        $taxonomies = $this->mc_get_post_taxonomies($post_type);
 
         ob_start();
         ?>
@@ -1231,18 +1456,31 @@ class WP_Dummy_Content_Filler
         wp_send_json_success(ob_get_clean());
     }
 
-    public function ajax_get_authors()
+    /**
+     * AJAX handler for getting authors list
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
+     */
+    public function mc_ajax_get_authors()
     {
         if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['nonce'], 'wpdcf_ajax_nonce')) {
             wp_die('Unauthorized');
         }
 
-        $authors = $this->get_authors();
+        $authors = $this->mc_get_authors();
         wp_send_json_success($authors);
     }
 
-
-    public function ajax_get_dummy_posts()
+    /**
+     * AJAX handler for getting dummy posts list
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
+     */
+    public function mc_ajax_get_dummy_posts()
     {
         if (!current_user_can('manage_options')) {
             wp_die('Unauthorized');
@@ -1263,10 +1501,10 @@ class WP_Dummy_Content_Filler
         }
 
         $args = [
-            'post_type' => $post_types,
+            'post_type'      => $post_types,
             'posts_per_page' => 50,
-            'meta_key' => WP_DUMMY_CONTENT_FILLER_META_KEY,
-            'meta_value' => '1',
+            'meta_key'       => WP_DUMMY_CONTENT_FILLER_META_KEY,
+            'meta_value'     => '1',
         ];
 
         $dummy_posts = get_posts($args);
@@ -1332,8 +1570,14 @@ class WP_Dummy_Content_Filler
         wp_send_json_success(ob_get_clean());
     }
 
-
-    public function render_post_types_page()
+    /**
+     * Render post types page
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
+     */
+    public function mc_render_post_types_page()
     {
         // Get public post types and exclude products
         $post_types = get_post_types(['public' => true], 'objects');
@@ -1350,7 +1594,7 @@ class WP_Dummy_Content_Filler
         <div class="wrap wp-dummy-content-filler">
             <h1>Dummy Content Filler - Post Types</h1>
 
-            <?php $this->show_results_message(); ?>
+            <?php $this->mc_show_results_message(); ?>
 
             <h2 class="nav-tab-wrapper">
                 <a href="#generate-tab" class="nav-tab nav-tab-active">Generate Posts</a>
@@ -1457,10 +1701,16 @@ class WP_Dummy_Content_Filler
         <?php
     }
 
-
-    public function render_users_page()
+    /**
+     * Render users page
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
+     */
+    public function mc_render_users_page()
     {
-        $user_meta_keys = $this->get_user_meta_keys();
+        $user_meta_keys = $this->mc_get_user_meta_keys();
         ?>
         <div class="wrap wp-dummy-content-filler">
             <h1>Dummy Content Filler - Users</h1>
@@ -1517,7 +1767,7 @@ class WP_Dummy_Content_Filler
                             </thead>
                             <tbody>
                                 <?php foreach ($user_meta_keys as $meta_key => $field_label):
-                                    $auto_type = $this->get_auto_field_type($meta_key);
+                                    $auto_type = $this->mc_get_auto_field_type($meta_key);
                                     ?>
                                     <tr>
                                         <td>
@@ -1559,7 +1809,7 @@ class WP_Dummy_Content_Filler
                 <h3>Dummy Users Created by Plugin</h3>
                 <?php
                 $dummy_users = get_users([
-                    'meta_key' => WP_DUMMY_CONTENT_FILLER_META_KEY,
+                    'meta_key'   => WP_DUMMY_CONTENT_FILLER_META_KEY,
                     'meta_value' => '1',
                 ]);
 
@@ -1571,8 +1821,8 @@ class WP_Dummy_Content_Filler
 
                     foreach ($dummy_users as $user) {
                         $first_name = get_user_meta($user->ID, 'first_name', true);
-                        $last_name = get_user_meta($user->ID, 'last_name', true);
-                        $full_name = trim($first_name . ' ' . $last_name);
+                        $last_name  = get_user_meta($user->ID, 'last_name', true);
+                        $full_name  = trim($first_name . ' ' . $last_name);
 
                         echo '<tr>';
                         echo '<td>' . esc_html($user->ID) . '</td>';
@@ -1581,7 +1831,6 @@ class WP_Dummy_Content_Filler
                         echo '<td>' . esc_html($full_name ?: 'N/A') . '</td>';
                         echo '<td>' . esc_html(implode(', ', $user->roles)) . '</td>';
                         echo '<td>';
-                        // Removed Edit button, keeping only View Profile
                         echo '<a href="' . esc_url(admin_url('profile.php?user_id=' . $user->ID)) . '" class="button button-small" target="_blank">View Profile</a>';
                         echo '</td>';
                         echo '</tr>';
@@ -1593,9 +1842,9 @@ class WP_Dummy_Content_Filler
                     echo '<div style="margin-top: 20px; padding: 15px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">';
                     echo '<p><strong>Warning:</strong> This will permanently delete ALL dummy users (except admin) along with their meta data.</p>';
                     echo '<p><a href="' . esc_url(add_query_arg([
-                        'page' => 'wp-dummy-content-filler-users',
+                        'page'             => 'wp-dummy-content-filler-users',
                         'clear_dummy_users' => '1',
-                        '_wpnonce' => $nonce
+                        '_wpnonce'          => $nonce
                     ], admin_url('admin.php'))) . '" class="button button-danger" onclick="return confirm(\'WARNING: This will PERMANENTLY delete ALL dummy users (except admin) along with their meta data. This action cannot be undone. Are you sure?\')">Delete All Dummy Users</a></p>';
                     echo '</div>';
                 } else {
@@ -1607,7 +1856,14 @@ class WP_Dummy_Content_Filler
         <?php
     }
 
-    public function render_products_page()
+    /**
+     * Render products page (placeholder)
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
+     */
+    public function mc_render_products_page()
     {
         ?>
         <div class="wrap">
@@ -1618,7 +1874,14 @@ class WP_Dummy_Content_Filler
         <?php
     }
 
-    public function render_settings_page()
+    /**
+     * Render settings page
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
+     */
+    public function mc_render_settings_page()
     {
         ?>
         <div class="wrap">
@@ -1632,7 +1895,14 @@ class WP_Dummy_Content_Filler
         <?php
     }
 
-    private function show_results_message()
+    /**
+     * Show results message from transient
+     *
+     * @since 1.0.0
+     * @access private
+     * @return void
+     */
+    private function mc_show_results_message()
     {
         $results = get_transient('dummy_content_results');
         if ($results) {
@@ -1643,8 +1913,12 @@ class WP_Dummy_Content_Filler
 
     /**
      * Exclude products from post types page
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
      */
-    public function exclude_products_from_post_types()
+    public function mc_exclude_products_from_post_types()
     {
         add_filter('wpdcf_get_post_types', function ($post_types) {
             if (isset($post_types['product'])) {
