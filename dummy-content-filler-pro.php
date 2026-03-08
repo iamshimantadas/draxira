@@ -1,11 +1,15 @@
 <?php
 /*
  * Plugin Name:       Dummy Content Filler Pro
+ * Plugin URI:        https://microcodes.in/dummy-content-filler-pro
  * Description:       Dummy Content Filler Pro is a WordPress plugin that helps to fill dummy posts into targeted post-types with custom options such featured image, post meta etc.
- * Text Domain:       dummy-content-filler-pro
  * Version:           1.0.0
- * Author:            shimanta das
+ * Author:            Shimanta Das
  * Author URI:        https://microcodes.in
+ * License:           GPL v2 or later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       dummy-content-filler-pro
+ * Domain Path:       /languages
  * 
  * @package Dummy_Content_Filler_Pro
  * 
@@ -35,6 +39,10 @@ require_once DUMMY_CONTENT_FILLER_PRO_PLUGIN_DIR . 'includes/class-dummy-content
 
 // Initialize plugin
 add_action('plugins_loaded', function () {
+    // Load text domain
+    load_plugin_textdomain('dummy-content-filler-pro', false, dirname(plugin_basename(__FILE__)) . '/languages');
+
+    //plugin main initialize
     Dummy_Content_Filler_Pro::mc_get_instance();
 
     // if woocommerce enable

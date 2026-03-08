@@ -1,0 +1,34 @@
+{
+    "name": "microcodes/dummy-content-filler-pro",
+    "description": "WordPress plugin to generate dummy content for posts, pages, custom post types, users, and WooCommerce products.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Shimanta Das",
+            "email": "your-email@microcodes.in",
+            "homepage": "https://microcodes.in"
+        }
+    ],
+    "require": {
+        "php": ">=7.2",
+        "fakerphp/faker": "^1.23"
+    },
+    "require-dev": {
+        "wp-coding-standards/wpcs": "^3.0",
+        "phpcompatibility/phpcompatibility-wp": "^2.1"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
+    "scripts": {
+        "phpcs": "phpcs --standard=WordPress",
+        "phpcbf": "phpcbf --standard=WordPress"
+    },
+    "support": {
+        "issues": "https://github.com/microcodes/dummy-content-filler-pro/issues",
+        "source": "https://github.com/microcodes/dummy-content-filler-pro"
+    }
+}
