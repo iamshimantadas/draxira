@@ -49,11 +49,12 @@ add_action('plugins_loaded', function () {
 /**
  * Increase execution limits for bulk operations
  */
-function draxira_increase_limits() {
+function draxira_increase_limits()
+{
     if (function_exists('set_time_limit')) {
         set_time_limit(600);
     }
-    
+
     if (function_exists('ini_set')) {
         ini_set('memory_limit', '512M');
         ini_set('max_execution_time', '600');
@@ -62,7 +63,7 @@ function draxira_increase_limits() {
 }
 
 // Hook into admin_init to increase limits for plugin pages
-add_action('admin_init', function() {
+add_action('admin_init', function () {
     if (isset($_GET['page']) && strpos($_GET['page'], 'draxira') !== false) {
         draxira_increase_limits();
     }

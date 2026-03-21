@@ -18,7 +18,7 @@
     ],
     "require": {
         "php": ">=7.2",
-        "fakerphp/faker": "^1.23",
+        "fakerphp/faker": "^1.19",
         "composer/installers": "^1.0 || ^2.0"
     },
     "require-dev": {
@@ -34,10 +34,7 @@
             "dealerdirect/phpcodesniffer-composer-installer": true,
             "composer/installers": true
         },
-        "preferred-install": "dist",
-        "platform": {
-            "php": "7.2"
-        }
+        "preferred-install": "dist"
     },
     "scripts": {
         "phpcs": "phpcs --standard=WordPress --extensions=php --ignore=vendor/,node_modules/,assets/",
@@ -47,21 +44,11 @@
             "@phpcs",
             "@phpunit"
         ],
-        "post-autoload-dump": [
-            "@php -r \"if (PHP_OS_FAMILY === 'Windows') { system('rd /s /q vendor\\fakerphp\\faker\\test 2>nul'); } else { system('rm -rf vendor/fakerphp/faker/test'); }\"",
-            "@php -r \"if (PHP_OS_FAMILY === 'Windows') { system('rd /s /q vendor\\fakerphp\\faker\\tests 2>nul'); } else { system('rm -rf vendor/fakerphp/faker/tests'); }\"",
-            "@php -r \"if (PHP_OS_FAMILY === 'Windows') { system('rd /s /q vendor\\fakerphp\\faker\\docs 2>nul'); } else { system('rm -rf vendor/fakerphp/faker/docs'); }\"",
-            "@php -r \"foreach(['md', 'txt', 'yml', 'yaml', 'xml', 'dist'] as $ext) { system('find vendor -type f -name \\\"*.$ext\\\" -delete 2>/dev/null'); }\""
-        ],
         "post-install-cmd": [
-            "@post-autoload-dump"
+            "@php -r \"if (PHP_OS === 'WINNT') { system('rd /s /q vendor\\fakerphp\\faker\\test 2>nul'); system('rd /s /q vendor\\fakerphp\\faker\\tests 2>nul'); system('rd /s /q vendor\\fakerphp\\faker\\docs 2>nul'); } else { system('rm -rf vendor/fakerphp/faker/test vendor/fakerphp/faker/tests vendor/fakerphp/faker/docs 2>/dev/null'); }\""
         ],
         "post-update-cmd": [
-            "@post-autoload-dump"
-        ],
-        "pre-package": [
-            "composer install --no-dev --optimize-autoloader",
-            "@php -r \"copy('vendor/autoload.php', 'autoload.php');\""
+            "@post-install-cmd"
         ]
     },
     "support": {
@@ -77,9 +64,7 @@
         "woocommerce",
         "acf",
         "cmb2",
-        "content generator",
-        "development",
-        "testing"
+        "content generator"
     ],
     "minimum-stability": "stable",
     "prefer-stable": true,

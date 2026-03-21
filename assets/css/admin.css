@@ -268,19 +268,19 @@
         width: auto;
         padding: 15px 10px 5px 0;
     }
-    
+
     .draxira .form-table td {
         padding: 5px 10px 15px 0;
     }
-    
+
     .draxira .widefat select {
         max-width: 100%;
     }
-    
+
     .draxira .button-group {
         flex-direction: column;
     }
-    
+
     .draxira .button-group .button {
         width: 100%;
         text-align: center;

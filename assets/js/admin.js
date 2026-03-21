@@ -1,4 +1,4 @@
-(function($) {
+(function ($) {
     'use strict';
 
     /**
@@ -6,7 +6,7 @@
      * 
      * @since 1.0.0
      */
-    $(document).ready(function() {
+    $(document).ready(function () {
         mc_drax_initTabSwitching();
         mc_drax_initPostTypeHandlers();
         mc_drax_initDeleteConfirmations();
@@ -19,7 +19,7 @@
      * @since 1.0.0
      */
     function mc_drax_initTabSwitching() {
-        $('.nav-tab-wrapper a').on('click', function(e) {
+        $('.nav-tab-wrapper a').on('click', function (e) {
             e.preventDefault();
             var tab = $(this).attr('href');
 
@@ -76,12 +76,12 @@
         }
 
         // Load post meta when post type changes
-        $('#post-type-selector').on('change', function() {
+        $('#post-type-selector').on('change', function () {
             mc_drax_loadPostMeta();
         });
 
         // Apply filter button click
-        $('#apply-filter').on('click', function() {
+        $('#apply-filter').on('click', function () {
             mc_drax_loadDummyPosts();
         });
 
@@ -91,7 +91,7 @@
         }
 
         // Set delete post type from filter
-        $('#filter-post-type').on('change', function() {
+        $('#filter-post-type').on('change', function () {
             $('#delete-post-type').val($(this).val());
         });
     }
@@ -108,7 +108,7 @@
         }
 
         // Load dummy products button click
-        $('#load-dummy-products').on('click', function() {
+        $('#load-dummy-products').on('click', function () {
             mc_drax_loadDummyProducts();
         });
 
@@ -125,24 +125,24 @@
      */
     function mc_drax_initDeleteConfirmations() {
         // Add confirmation for individual post deletion
-        $(document).on('click', '.draxira-button-danger, .button-link-delete', function(e) {
+        $(document).on('click', '.draxira-button-danger, .button-link-delete', function (e) {
             var confirmMessage = $(this).data('confirm-message') || draxira_ajax.confirm_delete || 'Are you sure? This action cannot be undone.';
-            
+
             if (!confirm(confirmMessage)) {
                 e.preventDefault();
                 return false;
             }
-            
+
             return true;
         });
-        
+
         // Handle delete buttons that are links
-        $(document).on('click', '.button-danger', function(e) {
+        $(document).on('click', '.button-danger', function (e) {
             if ($(this).text().indexOf('Delete') !== -1 && !$(this).hasClass('confirmed')) {
                 e.preventDefault();
                 var href = $(this).attr('href');
                 var confirmMsg = $(this).data('confirm-message') || draxira_ajax.confirm_delete_post || 'Are you sure? This will delete the post and all its meta data.';
-                
+
                 if (confirm(confirmMsg)) {
                     $(this).addClass('confirmed');
                     window.location.href = href;
@@ -167,17 +167,17 @@
                 post_type: postType,
                 nonce: draxira_ajax.nonce
             },
-            beforeSend: function() {
+            beforeSend: function () {
                 $('#post-meta-configuration').html('<div class="draxira-loading"><p>' + draxira_ajax.loading_message + '</p></div>');
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.success) {
                     $('#post-meta-configuration').html(response.data);
                 } else {
                     $('#post-meta-configuration').html('<div class="draxira-error"><p>' + draxira_ajax.error_message + '</p></div>');
                 }
             },
-            error: function() {
+            error: function () {
                 $('#post-meta-configuration').html('<div class="draxira-error"><p>' + draxira_ajax.error_message + '</p></div>');
             }
         });
@@ -198,10 +198,10 @@
                 action: 'draxira_get_dummy_posts',
                 post_type: postType
             },
-            beforeSend: function() {
+            beforeSend: function () {
                 $('#dummy-posts-list').html('<div class="draxira-loading"><p>' + draxira_ajax.loading_posts + '</p></div>');
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.success) {
                     $('#dummy-posts-list').html(response.data);
                     $('#delete-section').show();
@@ -210,7 +210,7 @@
                     $('#delete-section').hide();
                 }
             },
-            error: function() {
+            error: function () {
                 $('#dummy-posts-list').html('<div class="draxira-error"><p>' + draxira_ajax.error_loading_posts + '</p></div>');
                 $('#delete-section').hide();
             }
@@ -230,17 +230,17 @@
                 action: 'draxira_get_product_meta',
                 nonce: draxira_ajax.nonce
             },
-            beforeSend: function() {
+            beforeSend: function () {
                 $('#product-meta-configuration').html('<div class="draxira-loading"><p>' + draxira_ajax.loading_products + '</p></div>');
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.success) {
                     $('#product-meta-configuration').html(response.data);
                 } else {
                     $('#product-meta-configuration').html('<div class="draxira-error"><p>' + draxira_ajax.error_message + '</p></div>');
                 }
             },
-            error: function() {
+            error: function () {
                 $('#product-meta-configuration').html('<div class="draxira-error"><p>' + draxira_ajax.error_message + '</p></div>');
             }
         });
@@ -258,10 +258,10 @@
             data: {
                 action: 'draxira_get_dummy_products'
             },
-            beforeSend: function() {
+            beforeSend: function () {
                 $('#dummy-products-list').html('<div class="draxira-loading"><p>' + draxira_ajax.loading_products + '</p></div>');
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.success) {
                     $('#dummy-products-list').html(response.data);
                     $('#delete-section').show();
@@ -270,7 +270,7 @@
                     $('#delete-section').hide();
                 }
             },
-            error: function() {
+            error: function () {
                 $('#dummy-products-list').html('<div class="draxira-error"><p>' + draxira_ajax.error_loading_products + '</p></div>');
                 $('#delete-section').hide();
             }

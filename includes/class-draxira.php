@@ -7,6 +7,11 @@
  * @since 1.0.0
  */
 
+// Prevent direct access
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 /**
  * Class Draxira
  * 
@@ -44,27 +49,27 @@ class Draxira
      * @var array
      */
     private $mc_drax_faker_types = [
-        'text'       => 'Text (Sentence)',
+        'text' => 'Text (Sentence)',
         'paragraphs' => 'Text (Paragraphs)',
-        'words'      => 'Text (Words)',
-        'name'       => 'Name',
-        'email'      => 'Email',
-        'phone'      => 'Phone Number',
-        'address'    => 'Address',
-        'city'       => 'City',
-        'country'    => 'Country',
-        'zipcode'    => 'ZIP Code',
-        'number'     => 'Number (1-100)',
-        'price'      => 'Price (10-1000)',
-        'date'       => 'Date',
-        'boolean'    => 'Boolean (Yes/No)',
-        'url'        => 'URL',
-        'image_url'  => 'Image URL',
-        'color'      => 'Color',
-        'hex_color'  => 'Hex Color',
-        'latitude'   => 'Latitude',
-        'longitude'  => 'Longitude',
-        'company'    => 'Company Name',
+        'words' => 'Text (Words)',
+        'name' => 'Name',
+        'email' => 'Email',
+        'phone' => 'Phone Number',
+        'address' => 'Address',
+        'city' => 'City',
+        'country' => 'Country',
+        'zipcode' => 'ZIP Code',
+        'number' => 'Number (1-100)',
+        'price' => 'Price (10-1000)',
+        'date' => 'Date',
+        'boolean' => 'Boolean (Yes/No)',
+        'url' => 'URL',
+        'image_url' => 'Image URL',
+        'color' => 'Color',
+        'hex_color' => 'Hex Color',
+        'latitude' => 'Latitude',
+        'longitude' => 'Longitude',
+        'company' => 'Company Name',
     ];
 
     /**
@@ -124,7 +129,7 @@ class Draxira
         if (class_exists('WooCommerce')) {
             add_action('admin_menu', [$this, 'mc_drax_add_products_menu'], 11);
         }
-        
+
         // Exclude products from post types
         add_action('admin_init', [$this, 'mc_drax_exclude_products_from_post_types']);
     }
@@ -157,17 +162,17 @@ class Draxira
 
             // Localize script for AJAX with all messages
             wp_localize_script('draxira-admin', 'draxira_ajax', [
-                'ajax_url'              => admin_url('admin-ajax.php'),
-                'nonce'                 => wp_create_nonce('draxira_ajax_nonce'),
-                'loading_message'       => __('Loading configuration...', 'draxira'),
-                'loading_posts'         => __('Loading dummy posts...', 'draxira'),
-                'loading_products'      => __('Loading dummy products...', 'draxira'),
-                'error_message'         => __('Error loading configuration.', 'draxira'),
-                'error_loading_posts'   => __('Error loading posts.', 'draxira'),
+                'ajax_url' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('draxira_ajax_nonce'),
+                'loading_message' => __('Loading configuration...', 'draxira'),
+                'loading_posts' => __('Loading dummy posts...', 'draxira'),
+                'loading_products' => __('Loading dummy products...', 'draxira'),
+                'error_message' => __('Error loading configuration.', 'draxira'),
+                'error_loading_posts' => __('Error loading posts.', 'draxira'),
                 'error_loading_products' => __('Error loading products.', 'draxira'),
-                'confirm_delete'        => __('Are you sure? This action cannot be undone.', 'draxira'),
-                'confirm_delete_post'   => __('Are you sure? This will delete the post and all its meta data.', 'draxira'),
-                'confirm_delete_all'    => __('FINAL WARNING!\n\nThis will PERMANENTLY DELETE all dummy content.\nNo backup. No trash. Really sure?', 'draxira'),
+                'confirm_delete' => __('Are you sure? This action cannot be undone.', 'draxira'),
+                'confirm_delete_post' => __('Are you sure? This will delete the post and all its meta data.', 'draxira'),
+                'confirm_delete_all' => __('FINAL WARNING!\n\nThis will PERMANENTLY DELETE all dummy content.\nNo backup. No trash. Really sure?', 'draxira'),
             ]);
         }
     }
@@ -255,7 +260,7 @@ class Draxira
                 if (!in_array($post_type, get_post_types(['public' => true]), true)) {
                     set_transient('draxira_results', [
                         'message' => __('Invalid post type selected.', 'draxira'),
-                        'type'    => 'error'
+                        'type' => 'error'
                     ], 45);
                     wp_safe_redirect(admin_url('admin.php?page=draxira'));
                     exit;
@@ -333,11 +338,11 @@ class Draxira
      */
     private function mc_drax_generate_dummy_posts()
     {
-        $post_type      = sanitize_text_field($_POST['post_type'] ?? 'post');
-        $count          = intval($_POST['post_count'] ?? 5);
-        $with_images    = isset($_POST['with_images']);
+        $post_type = sanitize_text_field($_POST['post_type'] ?? 'post');
+        $count = intval($_POST['post_count'] ?? 5);
+        $with_images = isset($_POST['with_images']);
         $create_excerpt = isset($_POST['create_excerpt']);
-        $post_author    = intval($_POST['post_author'] ?? get_current_user_id());
+        $post_author = intval($_POST['post_author'] ?? get_current_user_id());
 
         // Get post meta configurations
         $post_meta_config = [];
@@ -380,12 +385,12 @@ class Draxira
         // Generate posts
         for ($i = 0; $i < $count; $i++) {
             $post_id = $this->mc_drax_create_dummy_post(
-                $post_type, 
-                $with_images, 
-                $create_excerpt, 
-                $post_author, 
-                $post_meta_config, 
-                $created_terms, 
+                $post_type,
+                $with_images,
+                $create_excerpt,
+                $post_author,
+                $post_meta_config,
+                $created_terms,
                 $taxonomy_config
             );
 
@@ -427,12 +432,12 @@ class Draxira
      * @return int|false Post ID on success, false on failure
      */
     private function mc_drax_create_dummy_post(
-        $post_type = 'post', 
-        $with_images = false, 
-        $create_excerpt = false, 
-        $post_author = 0, 
-        $meta_config = [], 
-        $created_terms = [], 
+        $post_type = 'post',
+        $with_images = false,
+        $create_excerpt = false,
+        $post_author = 0,
+        $meta_config = [],
+        $created_terms = [],
         $taxonomy_config = []
     ) {
         $faker = $this->mc_drax_get_faker();
@@ -443,11 +448,11 @@ class Draxira
         }
 
         $post_data = [
-            'post_title'   => $faker ? $faker->sentence(6) : 'Dummy Post ' . time() . ' ' . wp_rand(1000, 9999),
+            'post_title' => $faker ? $faker->sentence(6) : 'Dummy Post ' . time() . ' ' . wp_rand(1000, 9999),
             'post_content' => $faker ? $faker->paragraphs(3, true) : 'This is dummy content for testing purposes.',
-            'post_status'  => 'publish',
-            'post_type'    => $post_type,
-            'post_author'  => $post_author,
+            'post_status' => 'publish',
+            'post_type' => $post_type,
+            'post_author' => $post_author,
         ];
 
         // Add excerpt if requested
@@ -513,17 +518,17 @@ class Draxira
 
         // Get existing terms to avoid duplicates
         $existing_terms = get_terms([
-            'taxonomy'   => $taxonomy,
+            'taxonomy' => $taxonomy,
             'hide_empty' => false,
-            'fields'     => 'names'
+            'fields' => 'names'
         ]);
 
         if (is_wp_error($existing_terms)) {
             $existing_terms = [];
         }
 
-        $created      = 0;
-        $attempts     = 0;
+        $created = 0;
+        $attempts = 0;
         $max_attempts = $count * 3; // Prevent infinite loop
 
         while ($created < $count && $attempts < $max_attempts) {
@@ -550,7 +555,7 @@ class Draxira
             $term_slug = sanitize_title($term_name . '-' . wp_rand(100, 999));
 
             $term = wp_insert_term($term_name, $taxonomy, [
-                'slug'        => $term_slug,
+                'slug' => $term_slug,
                 'description' => $faker ? $faker->sentence() : 'Dummy term description'
             ]);
 
@@ -654,11 +659,11 @@ class Draxira
         }
 
         $random_image = $images[array_rand($images)];
-        $filename     = basename($random_image);
+        $filename = basename($random_image);
 
         // Check if image already exists in media library using WP_Query (replaces deprecated get_page_by_title)
         $existing_image = $this->mc_drax_get_attachment_by_title($filename);
-        
+
         if ($existing_image) {
             set_post_thumbnail($post_id, $existing_image);
             return true;
@@ -671,9 +676,9 @@ class Draxira
             $wp_filetype = wp_check_filetype($filename, null);
             $attachment = [
                 'post_mime_type' => $wp_filetype['type'],
-                'post_title'     => preg_replace('/\.[^.]+$/', '', $filename),
-                'post_content'   => '',
-                'post_status'    => 'inherit'
+                'post_title' => preg_replace('/\.[^.]+$/', '', $filename),
+                'post_content' => '',
+                'post_status' => 'inherit'
             ];
 
             $attachment_id = wp_insert_attachment($attachment, $upload_file['file']);
@@ -701,16 +706,16 @@ class Draxira
     private function mc_drax_get_attachment_by_title($title)
     {
         $query = new WP_Query([
-            'post_type'      => 'attachment',
-            'title'          => $title,
+            'post_type' => 'attachment',
+            'title' => $title,
             'posts_per_page' => 1,
-            'fields'         => 'ids',
+            'fields' => 'ids',
         ]);
-        
+
         if ($query->have_posts()) {
             return $query->posts[0];
         }
-        
+
         return false;
     }
 
@@ -800,8 +805,8 @@ class Draxira
     {
         $authors = get_users([
             'role__in' => ['administrator', 'editor', 'author'],
-            'orderby'  => 'display_name',
-            'order'    => 'ASC',
+            'orderby' => 'display_name',
+            'order' => 'ASC',
         ]);
 
         $author_list = [];
@@ -825,15 +830,15 @@ class Draxira
         global $wpdb;
 
         $args = [
-            'post_type'      => $post_type,
+            'post_type' => $post_type,
             'posts_per_page' => -1,
-            'meta_key'       => DRAXIRA_META_KEY,
-            'meta_value'     => '1',
-            'fields'         => 'ids',
-            'post_status'    => 'any', // Include all statuses
+            'meta_key' => DRAXIRA_META_KEY,
+            'meta_value' => '1',
+            'fields' => 'ids',
+            'post_status' => 'any', // Include all statuses
         ];
 
-        $dummy_posts   = get_posts($args);
+        $dummy_posts = get_posts($args);
         $deleted_count = 0;
 
         foreach ($dummy_posts as $post_id) {
@@ -914,11 +919,11 @@ class Draxira
         foreach ($taxonomies as $taxonomy) {
             // Get all terms with our dummy marker
             $terms = get_terms([
-                'taxonomy'     => $taxonomy,
-                'meta_key'     => DRAXIRA_META_KEY,
-                'meta_value'   => '1',
-                'hide_empty'   => false,
-                'fields'       => 'ids',
+                'taxonomy' => $taxonomy,
+                'meta_key' => DRAXIRA_META_KEY,
+                'meta_value' => '1',
+                'hide_empty' => false,
+                'fields' => 'ids',
             ]);
 
             if (!is_wp_error($terms) && !empty($terms)) {
@@ -943,49 +948,49 @@ class Draxira
 
         // 1. Default WordPress user fields (from wp_users table)
         $default_user_fields = [
-            'user_login'    => __('Username', 'draxira'),
-            'user_email'    => __('Email', 'draxira'),
-            'user_url'      => __('Website', 'draxira'),
-            'display_name'  => __('Display Name', 'draxira'),
-            'description'   => __('Biographical Info', 'draxira'),
+            'user_login' => __('Username', 'draxira'),
+            'user_email' => __('Email', 'draxira'),
+            'user_url' => __('Website', 'draxira'),
+            'display_name' => __('Display Name', 'draxira'),
+            'description' => __('Biographical Info', 'draxira'),
         ];
 
         // 2. Default WordPress user meta fields (commonly used)
         $default_user_meta = [
-            'nickname'               => __('Nickname', 'draxira'),
-            'first_name'             => __('First Name', 'draxira'),
-            'last_name'              => __('Last Name', 'draxira'),
-            'rich_editing'           => __('Visual Editor', 'draxira'),
-            'admin_color'            => __('Admin Color Scheme', 'draxira'),
-            'show_admin_bar_front'   => __('Show Toolbar', 'draxira'),
-            'locale'                 => __('Language', 'draxira'),
-            'comment_shortcuts'      => __('Keyboard Shortcuts', 'draxira'),
+            'nickname' => __('Nickname', 'draxira'),
+            'first_name' => __('First Name', 'draxira'),
+            'last_name' => __('Last Name', 'draxira'),
+            'rich_editing' => __('Visual Editor', 'draxira'),
+            'admin_color' => __('Admin Color Scheme', 'draxira'),
+            'show_admin_bar_front' => __('Show Toolbar', 'draxira'),
+            'locale' => __('Language', 'draxira'),
+            'comment_shortcuts' => __('Keyboard Shortcuts', 'draxira'),
         ];
 
         // 3. WooCommerce fields (if available)
         $woocommerce_fields = [];
         if (class_exists('WooCommerce')) {
             $woocommerce_fields = [
-                'billing_first_name'  => __('Billing First Name', 'draxira'),
-                'billing_last_name'   => __('Billing Last Name', 'draxira'),
-                'billing_company'     => __('Billing Company', 'draxira'),
-                'billing_address_1'   => __('Billing Address 1', 'draxira'),
-                'billing_address_2'   => __('Billing Address 2', 'draxira'),
-                'billing_city'        => __('Billing City', 'draxira'),
-                'billing_postcode'    => __('Billing Postcode', 'draxira'),
-                'billing_country'     => __('Billing Country', 'draxira'),
-                'billing_state'       => __('Billing State', 'draxira'),
-                'billing_phone'       => __('Billing Phone', 'draxira'),
-                'billing_email'       => __('Billing Email', 'draxira'),
+                'billing_first_name' => __('Billing First Name', 'draxira'),
+                'billing_last_name' => __('Billing Last Name', 'draxira'),
+                'billing_company' => __('Billing Company', 'draxira'),
+                'billing_address_1' => __('Billing Address 1', 'draxira'),
+                'billing_address_2' => __('Billing Address 2', 'draxira'),
+                'billing_city' => __('Billing City', 'draxira'),
+                'billing_postcode' => __('Billing Postcode', 'draxira'),
+                'billing_country' => __('Billing Country', 'draxira'),
+                'billing_state' => __('Billing State', 'draxira'),
+                'billing_phone' => __('Billing Phone', 'draxira'),
+                'billing_email' => __('Billing Email', 'draxira'),
                 'shipping_first_name' => __('Shipping First Name', 'draxira'),
-                'shipping_last_name'  => __('Shipping Last Name', 'draxira'),
-                'shipping_company'    => __('Shipping Company', 'draxira'),
-                'shipping_address_1'  => __('Shipping Address 1', 'draxira'),
-                'shipping_address_2'  => __('Shipping Address 2', 'draxira'),
-                'shipping_city'       => __('Shipping City', 'draxira'),
-                'shipping_postcode'   => __('Shipping Postcode', 'draxira'),
-                'shipping_country'    => __('Shipping Country', 'draxira'),
-                'shipping_state'      => __('Shipping State', 'draxira'),
+                'shipping_last_name' => __('Shipping Last Name', 'draxira'),
+                'shipping_company' => __('Shipping Company', 'draxira'),
+                'shipping_address_1' => __('Shipping Address 1', 'draxira'),
+                'shipping_address_2' => __('Shipping Address 2', 'draxira'),
+                'shipping_city' => __('Shipping City', 'draxira'),
+                'shipping_postcode' => __('Shipping Postcode', 'draxira'),
+                'shipping_country' => __('Shipping Country', 'draxira'),
+                'shipping_state' => __('Shipping State', 'draxira'),
             ];
         }
 
@@ -1121,21 +1126,21 @@ class Draxira
     {
         $mappings = [
             'first_name' => 'name',
-            'last_name'  => 'name',
-            'nickname'   => 'name',
+            'last_name' => 'name',
+            'nickname' => 'name',
             'display_name' => 'name',
             'description' => 'paragraphs',
-            'user_url'   => 'url',
-            'email'      => 'email',
-            'phone'      => 'phone',
-            'address'    => 'address',
-            'city'       => 'city',
-            'country'    => 'country',
-            'zip'        => 'zipcode',
-            'postcode'   => 'zipcode',
-            'company'    => 'company',
-            'price'      => 'price',
-            'date'       => 'date',
+            'user_url' => 'url',
+            'email' => 'email',
+            'phone' => 'phone',
+            'address' => 'address',
+            'city' => 'city',
+            'country' => 'country',
+            'zip' => 'zipcode',
+            'postcode' => 'zipcode',
+            'company' => 'company',
+            'price' => 'price',
+            'date' => 'date',
         ];
 
         foreach ($mappings as $key => $type) {
@@ -1157,7 +1162,7 @@ class Draxira
     private function mc_drax_generate_dummy_users()
     {
         $count = intval($_POST['user_count'] ?? 5);
-        $role  = sanitize_text_field($_POST['user_role'] ?? 'subscriber');
+        $role = sanitize_text_field($_POST['user_role'] ?? 'subscriber');
 
         // Get user meta configurations
         $user_meta_config = [];
@@ -1172,18 +1177,18 @@ class Draxira
         }
 
         $results = ['success' => 0, 'failed' => 0];
-        $faker   = $this->mc_drax_get_faker();
+        $faker = $this->mc_drax_get_faker();
 
         for ($i = 0; $i < $count; $i++) {
             $username = $faker ? $faker->userName : 'dummyuser_' . uniqid();
-            $email    = $faker ? $faker->email : $username . '@example.com';
+            $email = $faker ? $faker->email : $username . '@example.com';
 
             // Create user with basic data
             $userdata = [
                 'user_login' => $username,
                 'user_email' => $email,
-                'user_pass'  => 'password',
-                'role'       => $role,
+                'user_pass' => 'password',
+                'role' => $role,
             ];
 
             // Add optional user fields if configured
@@ -1206,7 +1211,7 @@ class Draxira
                 // Always add first name and last name
                 if ($faker) {
                     $first_name = $faker->firstName;
-                    $last_name  = $faker->lastName;
+                    $last_name = $faker->lastName;
 
                     update_user_meta($user_id, 'first_name', $first_name);
                     update_user_meta($user_id, 'last_name', $last_name);
@@ -1215,7 +1220,7 @@ class Draxira
                     if (!isset($userdata['display_name'])) {
                         $display_name = $faker->boolean(70) ? "$first_name $last_name" : $username;
                         wp_update_user([
-                            'ID'           => $user_id,
+                            'ID' => $user_id,
                             'display_name' => $display_name
                         ]);
                     }
@@ -1261,12 +1266,12 @@ class Draxira
         global $wpdb;
 
         $args = [
-            'meta_key'   => DRAXIRA_META_KEY,
+            'meta_key' => DRAXIRA_META_KEY,
             'meta_value' => '1',
-            'fields'     => 'ids',
+            'fields' => 'ids',
         ];
 
-        $dummy_users   = get_users($args);
+        $dummy_users = get_users($args);
         $deleted_count = 0;
 
         foreach ($dummy_users as $user_id) {
@@ -1334,26 +1339,26 @@ class Draxira
     }
 
     /**
- * AJAX handler for getting post meta fields
- *
- * @since 1.0.0
- * @access public
- * @return void
- */
-public function mc_drax_ajax_get_post_meta()
-{
-    if (!current_user_can('manage_options') || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['nonce'] ?? '')), 'draxira_ajax_nonce')) {
-        wp_die('Unauthorized');
-    }
+     * AJAX handler for getting post meta fields
+     *
+     * @since 1.0.0
+     * @access public
+     * @return void
+     */
+    public function mc_drax_ajax_get_post_meta()
+    {
+        if (!current_user_can('manage_options') || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['nonce'] ?? '')), 'draxira_ajax_nonce')) {
+            wp_die('Unauthorized');
+        }
 
-    $post_type  = sanitize_text_field($_POST['post_type']);
-    $meta_keys  = $this->mc_drax_get_post_meta_keys($post_type);
-    $taxonomies = $this->mc_drax_get_post_taxonomies($post_type);
-    
-    // Get authors directly - no AJAX needed since we already have the data
-    $authors = $this->mc_drax_get_authors();
+        $post_type = sanitize_text_field($_POST['post_type']);
+        $meta_keys = $this->mc_drax_get_post_meta_keys($post_type);
+        $taxonomies = $this->mc_drax_get_post_taxonomies($post_type);
 
-    $output = '<div class="post-meta-section">
+        // Get authors directly - no AJAX needed since we already have the data
+        $authors = $this->mc_drax_get_authors();
+
+        $output = '<div class="post-meta-section">
         <h3>' . esc_html__('Post Content Options', 'draxira') . '</h3>
         <table class="form-table">
             <tr>
@@ -1361,13 +1366,13 @@ public function mc_drax_ajax_get_post_meta()
                 <td>
                     <select name="post_author" id="post-author-selector">
                         <option value="0">' . esc_html__('Select User', 'draxira') . '</option>';
-    
-    // Add authors directly in the HTML
-    foreach ($authors as $author_id => $author_name) {
-        $output .= '<option value="' . esc_attr($author_id) . '">' . esc_html($author_name) . '</option>';
-    }
-    
-    $output .= '</select>
+
+        // Add authors directly in the HTML
+        foreach ($authors as $author_id => $author_name) {
+            $output .= '<option value="' . esc_attr($author_id) . '">' . esc_html($author_name) . '</option>';
+        }
+
+        $output .= '</select>
                     <span class="description">' . esc_html__('Select who will be the author of generated posts', 'draxira') . '</span>
                 </td>
             </tr>
@@ -1391,8 +1396,8 @@ public function mc_drax_ajax_get_post_meta()
             </tr>
         </table>';
 
-    if (!empty($taxonomies)):
-        $output .= '<h3>' . esc_html__('Taxonomies', 'draxira') . '</h3>
+        if (!empty($taxonomies)):
+            $output .= '<h3>' . esc_html__('Taxonomies', 'draxira') . '</h3>
             <p class="description">' . esc_html__('When "Create Terms" is enabled, 10 dummy terms will be automatically created for each taxonomy.', 'draxira') . '</p>
             <table class="widefat">
                 <thead>
@@ -1403,8 +1408,8 @@ public function mc_drax_ajax_get_post_meta()
                     </tr>
                 </thead>
                 <tbody>';
-        foreach ($taxonomies as $taxonomy_slug => $taxonomy_label):
-            $output .= '<tr>
+            foreach ($taxonomies as $taxonomy_slug => $taxonomy_label):
+                $output .= '<tr>
                 <td>
                     <strong>' . esc_html($taxonomy_label) . '</strong><br>
                     <small>' . esc_html($taxonomy_slug) . '</small>
@@ -1419,13 +1424,13 @@ public function mc_drax_ajax_get_post_meta()
                     <input type="number" name="taxonomies[' . esc_attr($taxonomy_slug) . '][assign]" min="1" max="10" value="2" style="width: 80px;">
                 </td>
             </tr>';
-        endforeach;
-        $output .= '</tbody>
+            endforeach;
+            $output .= '</tbody>
             </table>';
-    endif;
+        endif;
 
-    if (!empty($meta_keys)):
-        $output .= '<h3>' . esc_html__('Custom Post Meta Fields', 'draxira') . '</h3>
+        if (!empty($meta_keys)):
+            $output .= '<h3>' . esc_html__('Custom Post Meta Fields', 'draxira') . '</h3>
             <p class="description">' . esc_html__('Configure how each custom field should be filled. Only fields from ACF, CMB2, or similar plugins are listed.', 'draxira') . '</p>
             <table class="widefat">
                 <thead>
@@ -1436,8 +1441,8 @@ public function mc_drax_ajax_get_post_meta()
                     </tr>
                 </thead>
                 <tbody>';
-        foreach ($meta_keys as $meta_key => $field_label):
-            $output .= '<tr>
+            foreach ($meta_keys as $meta_key => $field_label):
+                $output .= '<tr>
                 <td><strong>' . esc_html($field_label) . '</strong></td>
                 <td>
                     <code>' . esc_html($meta_key) . '</code>
@@ -1446,24 +1451,24 @@ public function mc_drax_ajax_get_post_meta()
                 <td>
                     <select name="post_meta[' . esc_attr($meta_key) . '][type]">
                         <option value="">-- ' . esc_html__('Leave Empty', 'draxira') . ' --</option>';
-            foreach ($this->mc_drax_faker_types as $type_value => $type_label):
-                $output .= '<option value="' . esc_attr($type_value) . '">' . esc_html($type_label) . '</option>';
-            endforeach;
-            $output .= '</select>
+                foreach ($this->mc_drax_faker_types as $type_value => $type_label):
+                    $output .= '<option value="' . esc_attr($type_value) . '">' . esc_html($type_label) . '</option>';
+                endforeach;
+                $output .= '</select>
                 </td>
             </tr>';
-        endforeach;
-        $output .= '</tbody>
+            endforeach;
+            $output .= '</tbody>
             </table>';
-    else:
-        $output .= '<h3>' . esc_html__('Custom Post Meta Fields', 'draxira') . '</h3>
+        else:
+            $output .= '<h3>' . esc_html__('Custom Post Meta Fields', 'draxira') . '</h3>
             <p class="description">' . esc_html__('No custom fields from ACF, CMB2, or similar plugins found for this post type.', 'draxira') . '</p>';
-    endif;
+        endif;
 
-    $output .= '</div>';
-    
-    wp_send_json_success($output);
-}
+        $output .= '</div>';
+
+        wp_send_json_success($output);
+    }
 
     /**
      * AJAX handler for getting authors list
@@ -1510,10 +1515,10 @@ public function mc_drax_ajax_get_post_meta()
         }
 
         $args = [
-            'post_type'      => $post_types,
+            'post_type' => $post_types,
             'posts_per_page' => 50,
-            'meta_key'       => DRAXIRA_META_KEY,
-            'meta_value'     => '1',
+            'meta_key' => DRAXIRA_META_KEY,
+            'meta_value' => '1',
         ];
 
         $dummy_posts = get_posts($args);
@@ -1535,7 +1540,7 @@ public function mc_drax_ajax_get_post_meta()
                 </tr>
             </thead>
             <tbody>';
-        
+
         foreach ($dummy_posts as $post):
             $taxonomies = get_object_taxonomies($post->post_type);
             $post_terms = [];
@@ -1562,9 +1567,9 @@ public function mc_drax_ajax_get_post_meta()
                 </td>
             </tr>';
         endforeach;
-        
+
         $output .= '</tbody></table>';
-        
+
         wp_send_json_success($output);
     }
 
@@ -1607,12 +1612,14 @@ public function mc_drax_ajax_get_post_meta()
                             <td>
                                 <select name="post_type" id="post-type-selector">
                                     <?php foreach ($post_types as $type): ?>
-                                        <option value="<?php echo esc_attr($type->name); ?>" <?php selected($selected_post_type, $type->name); ?>>
+                                        <option value="<?php echo esc_attr($type->name); ?>" <?php echo esc_attr(selected($selected_post_type, $type->name, false)); ?>>
                                             <?php echo esc_html($type->label); ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
-                                <p class="description"><?php esc_html_e('Note: WooCommerce products are handled separately in the Products tab', 'draxira'); ?></p>
+                                <p class="description">
+                                    <?php esc_html_e('Note: WooCommerce products are handled separately in the Products tab', 'draxira'); ?>
+                                </p>
                             </td>
                         </tr>
                         <tr>
@@ -1628,14 +1635,17 @@ public function mc_drax_ajax_get_post_meta()
                     </div>
 
                     <p class="submit">
-                        <input type="submit" name="generate_posts" class="button button-primary" value="<?php esc_attr_e('Generate Posts', 'draxira'); ?>">
+                        <input type="submit" name="generate_posts" class="button button-primary"
+                            value="<?php esc_attr_e('Generate Posts', 'draxira'); ?>">
                     </p>
                 </form>
             </div>
 
             <div id="manage-tab" class="tab-content">
                 <h3><?php esc_html_e('Manage Dummy Posts', 'draxira'); ?></h3>
-                <p class="description"><?php esc_html_e('Note: This section only shows dummy posts for non-product post types. For WooCommerce products, use the Products tab.', 'draxira'); ?></p>
+                <p class="description">
+                    <?php esc_html_e('Note: This section only shows dummy posts for non-product post types. For WooCommerce products, use the Products tab.', 'draxira'); ?>
+                </p>
 
                 <div class="filter-section">
                     <form method="get" action="" class="filter-dummy-posts">
@@ -1652,7 +1662,8 @@ public function mc_drax_ajax_get_post_meta()
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <button type="button" id="apply-filter" class="button"><?php esc_html_e('Apply Filter', 'draxira'); ?></button>
+                                    <button type="button" id="apply-filter"
+                                        class="button"><?php esc_html_e('Apply Filter', 'draxira'); ?></button>
                                 </td>
                             </tr>
                         </table>
@@ -1666,14 +1677,17 @@ public function mc_drax_ajax_get_post_meta()
                 <div id="delete-section"
                     style="display:none; margin-top: 30px; padding: 20px; background: #fff5f5; border: 1px solid #ffb3b3; border-radius: 6px;">
                     <h4 style="color:#d63638; margin-top:0;"><?php esc_html_e('Delete Dummy Posts', 'draxira'); ?></h4>
-                    <p class="description"><strong><?php esc_html_e('Warning:', 'draxira'); ?></strong> <?php esc_html_e('This will permanently delete ALL dummy posts of the selected post type (including meta, terms, featured images, etc.). This cannot be undone.', 'draxira'); ?></p>
+                    <p class="description"><strong><?php esc_html_e('Warning:', 'draxira'); ?></strong>
+                        <?php esc_html_e('This will permanently delete ALL dummy posts of the selected post type (including meta, terms, featured images, etc.). This cannot be undone.', 'draxira'); ?>
+                    </p>
 
                     <form method="post" action="">
                         <?php wp_nonce_field('clear_dummy_posts', '_wpnonce'); ?>
                         <input type="hidden" name="clear_dummy_posts" value="1">
 
                         <p>
-                            <label for="delete-post-type"><strong><?php esc_html_e('Select post type to clean:', 'draxira'); ?></strong></label><br>
+                            <label
+                                for="delete-post-type"><strong><?php esc_html_e('Select post type to clean:', 'draxira'); ?></strong></label><br>
                             <select name="post_type" id="delete-post-type" required style="min-width:240px;">
                                 <option value="">— <?php esc_html_e('Select post type', 'draxira'); ?> —</option>
                                 <?php foreach ($post_types as $type): ?>
@@ -1685,7 +1699,8 @@ public function mc_drax_ajax_get_post_meta()
                         </p>
 
                         <p style="margin-top:20px;">
-                            <input type="submit" class="button button-large button-link-delete" value="<?php esc_attr_e('Delete All Dummy Posts', 'draxira'); ?>"
+                            <input type="submit" class="button button-large button-link-delete"
+                                value="<?php esc_attr_e('Delete All Dummy Posts', 'draxira'); ?>"
                                 onclick="return confirm('<?php echo esc_js(__('FINAL WARNING!\n\nThis will PERMANENTLY DELETE all dummy content for the selected post type.\nNo backup. No trash. Really sure?', 'draxira')); ?>');">
                         </p>
                     </form>
@@ -1718,7 +1733,8 @@ public function mc_drax_ajax_get_post_meta()
             ?>
 
             <h2 class="nav-tab-wrapper">
-                <a href="#generate-users-tab" class="nav-tab nav-tab-active"><?php esc_html_e('Generate Users', 'draxira'); ?></a>
+                <a href="#generate-users-tab"
+                    class="nav-tab nav-tab-active"><?php esc_html_e('Generate Users', 'draxira'); ?></a>
                 <a href="#manage-users-tab" class="nav-tab"><?php esc_html_e('Manage Dummy Users', 'draxira'); ?></a>
             </h2>
 
@@ -1749,7 +1765,9 @@ public function mc_drax_ajax_get_post_meta()
 
                     <div id="user-meta-configuration">
                         <h3><?php esc_html_e('User Information', 'draxira'); ?></h3>
-                        <p class="description"><?php esc_html_e('Configure how each user field should be filled. Only essential and custom fields are shown.', 'draxira'); ?></p>
+                        <p class="description">
+                            <?php esc_html_e('Configure how each user field should be filled. Only essential and custom fields are shown.', 'draxira'); ?>
+                        </p>
                         <table class="widefat">
                             <thead>
                                 <tr>
@@ -1770,81 +1788,83 @@ public function mc_drax_ajax_get_post_meta()
                                             <code><?php echo esc_html($meta_key); ?></code>
                                             <input type="hidden" name="user_meta[<?php echo esc_attr($meta_key); ?>][key]"
                                                 value="<?php echo esc_attr($meta_key); ?>">
-                                         </div>
-                                         <td>
-                                            <select name="user_meta[<?php echo esc_attr($meta_key); ?>][type]">
-                                                <option value="">-- <?php esc_html_e('Leave Empty', 'draxira'); ?> --</option>
-                                                <?php foreach ($this->mc_drax_faker_types as $type_value => $type_label):
-                                                    $selected = ($type_value === $auto_type) ? 'selected' : '';
-                                                    ?>
-                                                    <option value="<?php echo esc_attr($type_value); ?>" <?php echo $selected; ?>>
-                                                        <?php echo esc_html($type_label); ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                            <?php if ($auto_type): ?>
-                                                <br><small class="description"><?php esc_html_e('Auto-selected based on field name', 'draxira'); ?></small>
-                                            <?php endif; ?>
-                                         </div>
-                                     </tr>
+                        </div>
+                        <td>
+                            <select name="user_meta[<?php echo esc_attr($meta_key); ?>][type]">
+                                <option value="">-- <?php esc_html_e('Leave Empty', 'draxira'); ?> --</option>
+                                <?php foreach ($this->mc_drax_faker_types as $type_value => $type_label):
+                                    $selected = ($type_value === $auto_type) ? 'selected' : '';
+                                    ?>
+                                    <option value="<?php echo esc_attr($type_value); ?>" <?php echo $selected; ?>>
+                                        <?php echo esc_html($type_label); ?>
+                                    </option>
                                 <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                            </select>
+                            <?php if ($auto_type): ?>
+                                <br><small
+                                    class="description"><?php esc_html_e('Auto-selected based on field name', 'draxira'); ?></small>
+                            <?php endif; ?>
+                </div>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+            </table>
+        </div>
 
-                    <p class="submit">
-                        <input type="submit" name="generate_users" class="button button-primary" value="<?php esc_attr_e('Generate Users', 'draxira'); ?>">
-                    </p>
-                </form>
-            </div>
+        <p class="submit">
+            <input type="submit" name="generate_users" class="button button-primary"
+                value="<?php esc_attr_e('Generate Users', 'draxira'); ?>">
+        </p>
+        </form>
+        </div>
 
-            <div id="manage-users-tab" class="tab-content">
-                <h3><?php esc_html_e('Dummy Users Created by Plugin', 'draxira'); ?></h3>
-                <?php
-                $dummy_users = get_users([
-                    'meta_key'   => DRAXIRA_META_KEY,
-                    'meta_value' => '1',
-                ]);
+        <div id="manage-users-tab" class="tab-content">
+            <h3><?php esc_html_e('Dummy Users Created by Plugin', 'draxira'); ?></h3>
+            <?php
+            $dummy_users = get_users([
+                'meta_key' => DRAXIRA_META_KEY,
+                'meta_value' => '1',
+            ]);
 
-                if ($dummy_users) {
-                    echo '<p>' . sprintf(esc_html__('Found %d dummy users.', 'draxira'), count($dummy_users)) . '</p>';
-                    echo '<table class="widefat fixed striped">';
-                    echo '<thead><tr><th>' . esc_html__('ID', 'draxira') . '</th><th>' . esc_html__('Username', 'draxira') . '</th><th>' . esc_html__('Email', 'draxira') . '</th><th>' . esc_html__('Name', 'draxira') . '</th><th>' . esc_html__('Role', 'draxira') . '</th><th>' . esc_html__('Actions', 'draxira') . '</th></tr></thead>';
-                    echo '<tbody>';
+            if ($dummy_users) {
+                echo '<p>' . sprintf(esc_html__('Found %d dummy users.', 'draxira'), count($dummy_users)) . '</p>';
+                echo '<table class="widefat fixed striped">';
+                echo '<thead><tr><th>' . esc_html__('ID', 'draxira') . '</th><th>' . esc_html__('Username', 'draxira') . '</th><th>' . esc_html__('Email', 'draxira') . '</th><th>' . esc_html__('Name', 'draxira') . '</th><th>' . esc_html__('Role', 'draxira') . '</th><th>' . esc_html__('Actions', 'draxira') . '</th></tr></thead>';
+                echo '<tbody>';
 
-                    foreach ($dummy_users as $user) {
-                        $first_name = get_user_meta($user->ID, 'first_name', true);
-                        $last_name  = get_user_meta($user->ID, 'last_name', true);
-                        $full_name  = trim($first_name . ' ' . $last_name);
+                foreach ($dummy_users as $user) {
+                    $first_name = get_user_meta($user->ID, 'first_name', true);
+                    $last_name = get_user_meta($user->ID, 'last_name', true);
+                    $full_name = trim($first_name . ' ' . $last_name);
 
-                        echo '<tr>';
-                        echo '<td>' . esc_html($user->ID) . '</td>';
-                        echo '<td>' . esc_html($user->user_login) . '</td>';
-                        echo '<td>' . esc_html($user->user_email) . '</td>';
-                        echo '<td>' . esc_html($full_name ?: 'N/A') . '</td>';
-                        echo '<td>' . esc_html(implode(', ', $user->roles)) . '</td>';
-                        echo '<td>';
-                        echo '<a href="' . esc_url(admin_url('profile.php?user_id=' . $user->ID)) . '" class="button button-small" target="_blank">' . esc_html__('View Profile', 'draxira') . '</a>';
-                        echo '</td>';
-                        echo '</tr>';
-                    }
-
-                    echo '</tbody></table>';
-
-                    $nonce = wp_create_nonce('clear_dummy_users');
-                    echo '<div style="margin-top: 20px; padding: 15px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">';
-                    echo '<p><strong>' . esc_html__('Warning:', 'draxira') . '</strong> ' . esc_html__('This will permanently delete ALL dummy users (except admin) along with their meta data.', 'draxira') . '</p>';
-                    echo '<p><a href="' . esc_url(add_query_arg([
-                        'page'             => 'draxira-users',
-                        'clear_dummy_users' => '1',
-                        '_wpnonce'          => $nonce
-                    ], admin_url('admin.php'))) . '" class="button button-danger" onclick="return confirm(\'' . esc_js(__('WARNING: This will PERMANENTLY delete ALL dummy users (except admin) along with their meta data. This action cannot be undone. Are you sure?', 'draxira')) . '\')">' . esc_html__('Delete All Dummy Users', 'draxira') . '</a></p>';
-                    echo '</div>';
-                } else {
-                    echo '<p>' . esc_html__('No dummy users found.', 'draxira') . '</p>';
+                    echo '<tr>';
+                    echo '<td>' . esc_html($user->ID) . '</td>';
+                    echo '<td>' . esc_html($user->user_login) . '</td>';
+                    echo '<td>' . esc_html($user->user_email) . '</td>';
+                    echo '<td>' . esc_html($full_name ?: 'N/A') . '</td>';
+                    echo '<td>' . esc_html(implode(', ', $user->roles)) . '</td>';
+                    echo '<td>';
+                    echo '<a href="' . esc_url(admin_url('profile.php?user_id=' . $user->ID)) . '" class="button button-small" target="_blank">' . esc_html__('View Profile', 'draxira') . '</a>';
+                    echo '</td>';
+                    echo '</tr>';
                 }
-                ?>
-            </div>
+
+                echo '</tbody></table>';
+
+                $nonce = wp_create_nonce('clear_dummy_users');
+                echo '<div style="margin-top: 20px; padding: 15px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">';
+                echo '<p><strong>' . esc_html__('Warning:', 'draxira') . '</strong> ' . esc_html__('This will permanently delete ALL dummy users (except admin) along with their meta data.', 'draxira') . '</p>';
+                echo '<p><a href="' . esc_url(add_query_arg([
+                    'page' => 'draxira-users',
+                    'clear_dummy_users' => '1',
+                    '_wpnonce' => $nonce
+                ], admin_url('admin.php'))) . '" class="button button-danger" onclick="return confirm(\'' . esc_js(__('WARNING: This will PERMANENTLY delete ALL dummy users (except admin) along with their meta data. This action cannot be undone. Are you sure?', 'draxira')) . '\')">' . esc_html__('Delete All Dummy Users', 'draxira') . '</a></p>';
+                echo '</div>';
+            } else {
+                echo '<p>' . esc_html__('No dummy users found.', 'draxira') . '</p>';
+            }
+            ?>
+        </div>
         </div>
         <?php
     }
