@@ -6,7 +6,7 @@
     "authors": [
         {
             "name": "Shimanta Das",
-            "email": "your-email@microcodes.in",
+            "email": "shimanta@microcodes.in",
             "homepage": "https://microcodes.in"
         }
     ],
@@ -14,18 +14,22 @@
         "php": ">=7.2",
         "fakerphp/faker": "^1.23"
     },
-    "require-dev": {
-        "wp-coding-standards/wpcs": "^3.0",
-        "phpcompatibility/phpcompatibility-wp": "^2.1"
-    },
     "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true,
         "allow-plugins": {
             "dealerdirect/phpcodesniffer-composer-installer": true
         }
     },
     "scripts": {
         "phpcs": "phpcs --standard=WordPress",
-        "phpcbf": "phpcbf --standard=WordPress"
+        "phpcbf": "phpcbf --standard=WordPress",
+        "post-autoload-dump": [
+            "@php -r \"if (PHP_OS_FAMILY === 'Windows') { system('rd /s /q vendor\\fakerphp\\faker\\test 2>nul'); } else { system('rm -rf vendor/fakerphp/faker/test'); }\"",
+            "@php -r \"if (PHP_OS_FAMILY === 'Windows') { system('rd /s /q vendor\\fakerphp\\faker\\tests 2>nul'); } else { system('rm -rf vendor/fakerphp/faker/tests'); }\"",
+            "@php -r \"if (PHP_OS_FAMILY === 'Windows') { system('rd /s /q vendor\\fakerphp\\faker\\docs 2>nul'); } else { system('rm -rf vendor/fakerphp/faker/docs'); }\"",
+            "@php -r \"foreach(['md', 'txt', 'yml', 'yaml', 'xml', 'dist'] as $ext) { system('del /s /q vendor\\\\*.'.$ext.' 2>nul'); }\""
+        ]
     },
     "support": {
         "issues": "https://github.com/microcodes/dummy-content-filler-pro/issues",

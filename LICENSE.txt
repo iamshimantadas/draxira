@@ -1,7 +1,7 @@
-Dummy Content Filler Pro WordPress Plugin
+Draxira – Dummy Content Generator WordPress Plugin
 
 Copyright (C) 2026 Shimanta Das MicroCodes Inc.
-Dummy Content Filler Pro is distributed under the terms of the GNU GPL
+Draxira – Dummy Content Generator is distributed under the terms of the GNU GPL
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,8 +18,8 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 
-Dummy Content Filler Pro WordPress Plugin bundles the following third-party resources:
-walmart dummy csv: https://github.com/luminati-io/eCommerce-dataset-samples/blob/main/walmart-products.csv
+Draxira – Dummy Content Generator - WordPress Plugin bundles the following third-party resources:
+woo-products csv: https://glover.us/blog/woocommerce-sample-data-set/
 phpfaker package: https://fakerphp.org/
 
 

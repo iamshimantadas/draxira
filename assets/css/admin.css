@@ -1,179 +1,327 @@
 /**
- * WP Dummy Content Filler - Admin Styles
- * 
- * Styles for the admin interface of the dummy content generation plugin.
- * Includes tab styling, form layouts, table designs, and notification styles.
- *
- * @package Dummy_Content_Filler_Pro
- * @subpackage Assets
- * @since 1.0.0
- * @author Shimanta Das
- * @copyright 2026 Microcodes
+ * Draxira Plugin Admin Styles
+ * Version: 1.0.0
  */
+
+/* Main container */
+.draxira-wrap {
+    margin: 20px 20px 0 0;
+}
 
 /**
  * Tab content containers
  */
-.dummy-content-filler-pro .tab-content {
+.draxira .tab-content {
     display: none;
     margin-top: 20px;
     padding: 20px;
-    background: white;
+    background: #ffffff;
     border: 1px solid #ccd0d4;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, .04);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
     border-radius: 4px;
 }
 
-.dummy-content-filler-pro .tab-content.active {
+.draxira .tab-content.active {
     display: block;
 }
 
-.nav-tab-wrapper {
+.draxira .nav-tab-wrapper {
     margin-bottom: 0;
+    border-bottom: 1px solid #ccd0d4;
+}
+
+.draxira .nav-tab {
+    margin-right: 4px;
+}
+
+/**
+ * Form styles
+ */
+.draxira .form-table th {
+    width: 200px;
+    padding: 15px 10px 15px 0;
+}
+
+.draxira .form-table td {
+    padding: 15px 10px;
+}
+
+.draxira .form-table select {
+    min-width: 200px;
+}
+
+.draxira .form-table input[type="number"] {
+    width: 100px;
+}
+
+.draxira .description {
+    font-style: italic;
+    color: #666666;
+    margin: 5px 0 0 0;
 }
 
 /**
  * Danger button for delete actions
  */
-.button-danger {
+.draxira .button-danger,
+.draxira-button-danger {
     background: #d63638 !important;
     border-color: #d63638 !important;
-    color: white !important;
+    color: #ffffff !important;
 }
 
-.button-danger:hover {
+.draxira .button-danger:hover,
+.draxira-button-danger:hover {
     background: #b32d2e !important;
     border-color: #b32d2e !important;
+    color: #ffffff !important;
 }
 
-#post-meta-configuration,
-#user-meta-configuration {
+/**
+ * Meta configuration sections
+ */
+.draxira #post-meta-configuration,
+.draxira #user-meta-configuration,
+.draxira #product-meta-configuration {
     margin: 20px 0;
 }
 
-#post-meta-configuration table,
-#user-meta-configuration table {
+.draxira #post-meta-configuration table,
+.draxira #user-meta-configuration table,
+.draxira #product-meta-configuration table {
     margin-top: 10px;
     border-collapse: collapse;
+    width: 100%;
 }
 
-#post-meta-configuration th,
-#user-meta-configuration th {
+.draxira #post-meta-configuration th,
+.draxira #user-meta-configuration th,
+.draxira #product-meta-configuration th {
     font-weight: 600;
     background: #f6f7f7;
-    padding: 10px;
+    padding: 12px 10px;
+    text-align: left;
 }
 
-#post-meta-configuration td,
-#user-meta-configuration td {
-    padding: 10px;
+.draxira #post-meta-configuration td,
+.draxira #user-meta-configuration td,
+.draxira #product-meta-configuration td {
+    padding: 12px 10px;
     vertical-align: middle;
     border-bottom: 1px solid #f0f0f0;
 }
 
-#post-meta-configuration h3,
-#user-meta-configuration h3 {
+.draxira #post-meta-configuration h3,
+.draxira #user-meta-configuration h3,
+.draxira #product-meta-configuration h3 {
     margin-top: 30px;
     padding-bottom: 10px;
     border-bottom: 2px solid #f0f0f0;
+    font-size: 1.2em;
 }
 
-#post-meta-configuration h3:first-child,
-#user-meta-configuration h3:first-child {
+.draxira #post-meta-configuration h3:first-child,
+.draxira #user-meta-configuration h3:first-child,
+.draxira #product-meta-configuration h3:first-child {
     margin-top: 0;
 }
 
-.filter-section {
+/**
+ * Filter section
+ */
+.draxira .filter-section {
     margin-bottom: 20px;
     padding: 20px;
-    background: white;
+    background: #ffffff;
     border: 1px solid #ccd0d4;
     border-radius: 4px;
 }
 
-#dummy-posts-list {
+/**
+ * Posts and products list
+ */
+.draxira #dummy-posts-list,
+.draxira #dummy-products-list {
     margin: 20px 0;
 }
 
-#dummy-posts-list table {
+.draxira #dummy-posts-list table,
+.draxira #dummy-products-list table {
     margin-top: 10px;
+    width: 100%;
 }
 
+.draxira #dummy-posts-list .widefat th,
+.draxira #dummy-products-list .widefat th {
+    padding: 12px 8px;
+}
 
-#delete-section {
+.draxira #dummy-posts-list .widefat td,
+.draxira #dummy-products-list .widefat td {
+    padding: 10px 8px;
+    vertical-align: middle;
+}
+
+/**
+ * Delete section
+ */
+.draxira #delete-section {
     padding: 20px;
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
-    border-radius: 4px;
+    background: #fff5f5;
+    border: 1px solid #ffb3b3;
+    border-radius: 6px;
     margin-top: 20px;
 }
 
-.dashicons-format-image {
-    color: #2271b1;
-    vertical-align: middle;
-    margin-left: 5px;
+.draxira #delete-section h4 {
+    color: #d63638;
+    margin-top: 0;
+    margin-bottom: 12px;
 }
 
-
-.loading {
+/**
+ * Loading and error states
+ */
+.draxira-loading,
+.draxira .loading {
     text-align: center;
     padding: 40px;
-    color: #666;
+    color: #666666;
+    background: #f9f9f9;
+    border-radius: 4px;
 }
 
-
-.error {
+.draxira-error,
+.draxira .error {
     color: #d63638;
     padding: 20px;
     background: #f8d7da;
     border: 1px solid #f5c2c7;
     border-radius: 4px;
+    margin: 10px 0;
 }
 
-code {
+.draxira-notice {
+    padding: 12px 15px;
+    margin: 10px 0;
+    border-radius: 4px;
+}
+
+.draxira-notice-warning {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+}
+
+.draxira-notice-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+/**
+ * Code styling
+ */
+.draxira code {
     background: #f6f7f7;
-    padding: 2px 4px;
+    padding: 2px 6px;
     border-radius: 3px;
     font-size: 0.9em;
+    font-family: monospace;
 }
 
-.description {
-    font-style: italic;
-    color: #666;
-    margin: 5px 0 15px 0;
+/**
+ * Table styling for widefat tables
+ */
+.draxira .widefat {
+    border-radius: 4px;
+    overflow: hidden;
 }
 
-
-.widefat th,
-.widefat td {
-    vertical-align: middle;
+.draxira .widefat th {
+    background: #f1f1f1;
 }
 
-.widefat select {
+.draxira .widefat select {
     width: 100%;
     max-width: 200px;
 }
 
-.form-table select {
-    min-width: 200px;
+/**
+ * Button group styling
+ */
+.draxira .button-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
-.form-table th {
-    width: 200px;
+.draxira .button-small {
+    margin-right: 4px;
 }
 
-
-.notice {
-    margin: 20px 0 0 0;
-}
-
-
+/**
+ * Responsive design
+ */
 @media screen and (max-width: 782px) {
-    .form-table th {
+    .draxira .form-table th {
         width: auto;
+        padding: 15px 10px 5px 0;
     }
     
-    .widefat select {
+    .draxira .form-table td {
+        padding: 5px 10px 15px 0;
+    }
+    
+    .draxira .widefat select {
         max-width: 100%;
     }
+    
+    .draxira .button-group {
+        flex-direction: column;
+    }
+    
+    .draxira .button-group .button {
+        width: 100%;
+        text-align: center;
+        margin-bottom: 5px;
+    }
+}
+
+/**
+ * Icon styling
+ */
+.draxira .dashicons-format-image {
+    color: #2271b1;
+    vertical-align: middle;
+    margin-left: 5px;
+}
+
+/**
+ * Toolbar and admin bar integration
+ */
+.draxira .wp-list-table .button {
+    margin: 2px;
+}
+
+/**
+ * Progress indicator for bulk operations
+ */
+.draxira-progress {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: #ffffff;
+    padding: 20px 30px;
+    border-radius: 8px;
+    z-index: 100000;
+    text-align: center;
+}
+
+.draxira-progress .spinner {
+    float: none;
+    margin: 0 auto 10px;
+    visibility: visible;
 }
