@@ -1,6 +1,6 @@
 === Draxira – Dummy Content Generator ===
 Contributors: microcodes
-Tags: dummy content, dummy posts, dummy products, dummy users, content generator, test data, woocommerce dummy products, acf support, cmb2 support, dummy data, test content
+Tags: dummy content, dummy posts, test data, dummy users, content generator
 Requires at least: 5.0
 Tested up to: 6.9
 Requires PHP: 7.2
@@ -8,7 +8,7 @@ Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Generate realistic dummy content for posts, pages, custom post types, users, and WooCommerce products with advanced options including ACF, CMB2, and custom field support.
+Generate dummy posts, pages, custom post types, users, and WooCommerce products instantly.
 
 == Description ==
 

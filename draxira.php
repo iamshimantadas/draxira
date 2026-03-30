@@ -9,7 +9,6 @@
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: draxira
- * Domain Path: /languages
  * 
  * @package Draxira
  * 
@@ -33,12 +32,16 @@ if (file_exists($composer_autoload)) {
 }
 
 require_once DRAXIRA_PLUGIN_DIR . 'includes/class-draxira.php';
+require_once DRAXIRA_PLUGIN_DIR . 'includes/class-draxira-users.php';
 require_once DRAXIRA_PLUGIN_DIR . 'includes/class-draxira-products.php';
 
 // Initialize plugin
 add_action('plugins_loaded', function () {
     // Plugin main initialize
     Draxira::get_instance();
+
+    // Initialize users class
+    Draxira_Users::get_instance();
 
     // If woocommerce enabled
     if (class_exists('WooCommerce')) {

@@ -190,13 +190,15 @@
      */
     function mc_drax_loadDummyPosts() {
         var postType = $('#filter-post-type').val();
+        var nonce = draxira_ajax.nonce;
 
         $.ajax({
             url: draxira_ajax.ajax_url,
             type: 'GET',
             data: {
                 action: 'draxira_get_dummy_posts',
-                post_type: postType
+                post_type: postType,
+                _wpnonce: nonce
             },
             beforeSend: function () {
                 $('#dummy-posts-list').html('<div class="draxira-loading"><p>' + draxira_ajax.loading_posts + '</p></div>');
@@ -256,7 +258,8 @@
             url: draxira_ajax.ajax_url,
             type: 'GET',
             data: {
-                action: 'draxira_get_dummy_products'
+                action: 'draxira_get_dummy_products',
+                _wpnonce: draxira_ajax.nonce
             },
             beforeSend: function () {
                 $('#dummy-products-list').html('<div class="draxira-loading"><p>' + draxira_ajax.loading_products + '</p></div>');

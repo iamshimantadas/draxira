@@ -143,12 +143,43 @@ class Draxira_Products
      */
     private function mc_drax_init_hooks()
     {
+        // products scripts enqueue
+        add_action('admin_enqueue_scripts', [$this, 'mc_draxira_enqueue_product_scripts']);
+
         // Handle product generation
         add_action('admin_init', [$this, 'mc_drax_handle_product_actions']);
 
         // AJAX handlers
         add_action('wp_ajax_draxira_get_product_meta', [$this, 'mc_drax_ajax_get_product_meta']);
         add_action('wp_ajax_draxira_get_dummy_products', [$this, 'mc_drax_ajax_get_dummy_products']);
+    }
+
+    /**
+     * Enqueue product-specific scripts and styles
+     * 
+     * @since 1.0.0
+     * @param string $hook Current admin page hook
+     */
+    public function mc_draxira_enqueue_product_scripts($hook)
+    {
+        if ($hook === 'draxira_page_draxira-products') {
+            // Register and enqueue product-specific JavaScript
+            wp_enqueue_script(
+                'draxira-products',
+                DRAXIRA_PLUGIN_URL . 'assets/js/products.js',
+                ['jquery', 'draxira-admin'],
+                DRAXIRA_VERSION,
+                true
+            );
+
+            // Localize script for AJAX
+            wp_localize_script('draxira-products', 'draxira_products_ajax', [
+                'ajax_url' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('draxira_ajax_nonce'),
+                'loading_products' => __('Loading dummy products...', 'draxira'),
+                'error_loading_products' => __('Error loading products.', 'draxira'),
+            ]);
+        }
     }
 
     /**
@@ -1533,8 +1564,10 @@ class Draxira_Products
      */
     public function mc_drax_ajax_get_dummy_products()
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
+        // Add nonce check
+        if (!current_user_can('manage_options') || !wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['_wpnonce'] ?? '')), 'draxira_ajax_nonce')) {
+            wp_send_json_error(__('Security check failed.', 'draxira'));
+            wp_die();
         }
 
         $args = [
@@ -1716,90 +1749,6 @@ class Draxira_Products
             </div>
         </div>
 
-        <script>
-            jQuery(document).ready(function ($) {
-                $('.nav-tab-wrapper a').click(function (e) {
-                    e.preventDefault();
-                    var tab = $(this).attr('href');
-
-                    $('.nav-tab').removeClass('nav-tab-active');
-                    $(this).addClass('nav-tab-active');
-
-                    $('.tab-content').removeClass('active');
-                    $(tab).addClass('active');
-
-                    if (tab === '#generate-products-tab') {
-                        loadProductMeta();
-                    }
-
-                    if (tab === '#manage-products-tab') {
-                        loadDummyProducts();
-                    }
-                });
-
-                if ($('#generate-products-tab').hasClass('active')) {
-                    loadProductMeta();
-                }
-
-                $('#load-dummy-products').click(function () {
-                    loadDummyProducts();
-                });
-
-                function loadProductMeta() {
-                    $.ajax({
-                        url: draxira_ajax.ajax_url,
-                        type: 'POST',
-                        data: {
-                            action: 'draxira_get_product_meta',
-                            nonce: draxira_ajax.nonce
-                        },
-                        beforeSend: function () {
-                            $('#product-meta-configuration').html('<div class="loading"><p><?php echo esc_js(__('Loading product configuration...', 'draxira')); ?></p></div>');
-                        },
-                        success: function (response) {
-                            if (response.success) {
-                                $('#product-meta-configuration').html(response.data);
-                            } else {
-                                $('#product-meta-configuration').html('<div class="error"><p><?php echo esc_js(__('Error loading product configuration.', 'draxira')); ?></p></div>');
-                            }
-                        },
-                        error: function () {
-                            $('#product-meta-configuration').html('<div class="error"><p><?php echo esc_js(__('Error loading product configuration.', 'draxira')); ?></p></div>');
-                        }
-                    });
-                }
-
-                function loadDummyProducts() {
-                    $.ajax({
-                        url: draxira_ajax.ajax_url,
-                        type: 'GET',
-                        data: {
-                            action: 'draxira_get_dummy_products'
-                        },
-                        beforeSend: function () {
-                            $('#dummy-products-list').html('<div class="loading"><p><?php echo esc_js(__('Loading dummy products...', 'draxira')); ?></p></div>');
-                        },
-                        success: function (response) {
-                            if (response.success) {
-                                $('#dummy-products-list').html(response.data);
-                                $('#delete-section').show();
-                            } else {
-                                $('#dummy-products-list').html('<div class="notice notice-warning"><p>' + response.data + '</p></div>');
-                                $('#delete-section').hide();
-                            }
-                        },
-                        error: function () {
-                            $('#dummy-products-list').html('<div class="error"><p><?php echo esc_js(__('Error loading products.', 'draxira')); ?></p></div>');
-                            $('#delete-section').hide();
-                        }
-                    });
-                }
-
-                if ($('#manage-products-tab').hasClass('active')) {
-                    loadDummyProducts();
-                }
-            });
-        </script>
         <?php
     }
 }

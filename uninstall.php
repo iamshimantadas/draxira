@@ -19,6 +19,11 @@ if (!defined('WP_UNINSTALL_PLUGIN')) {
     exit;
 }
 
+// Additional security: Verify the user has permission to uninstall plugins
+if (!current_user_can('activate_plugins')) {
+    return;
+}
+
 /**
  * Recursively delete a directory using WP_Filesystem
  *
@@ -74,9 +79,8 @@ function draxira_uninstall_cleanup()
     // Define the meta key used to identify dummy content
     $meta_key = '_draxira_dummy_content';
 
-    // Get all dummy posts (including products if WooCommerce is/was installed)
     $post_types = get_post_types(['public' => true]);
-
+    
     // Include product post type even if WooCommerce not active (for cleanup)
     if (!in_array('product', $post_types)) {
         $post_types[] = 'product';
@@ -98,14 +102,13 @@ function draxira_uninstall_cleanup()
         }
     }
 
-    // Clean up any orphaned post meta (safety measure)
+    // Clean up any orphaned post meta
     $wpdb->query("
         DELETE pm FROM {$wpdb->postmeta} pm
         LEFT JOIN {$wpdb->posts} p ON p.ID = pm.post_id
         WHERE p.ID IS NULL
     ");
 
-    // Get all dummy users
     $dummy_users = get_users([
         'meta_key' => $meta_key,
         'meta_value' => '1',
@@ -114,34 +117,36 @@ function draxira_uninstall_cleanup()
 
     if (!empty($dummy_users)) {
         foreach ($dummy_users as $user_id) {
-            // Don't delete admin user (ID 1)
-            if ($user_id != 1) {
-                wp_delete_user($user_id);
-            } else {
-                // If admin user is marked as dummy, just remove the meta
-                delete_user_meta($user_id, $meta_key);
+            // Extra security: Double-check this is a dummy user
+            $is_dummy = get_user_meta($user_id, $meta_key, true);
+            
+            if ($is_dummy === '1') {
+                // Don't delete admin user (ID 1)
+                if ($user_id != 1) {
+                    // Reassign content to admin (0 = delete all content)
+                    // Using wp_delete_user is necessary for complete cleanup
+                    wp_delete_user($user_id, 0);
+                } else {
+                    // If admin user is marked as dummy, just remove the meta
+                    delete_user_meta($user_id, $meta_key);
+                }
             }
         }
     }
 
-    // Clean up any orphaned user meta (safety measure)
+    // Clean up any orphaned user meta
     $wpdb->query("
         DELETE um FROM {$wpdb->usermeta} um
         LEFT JOIN {$wpdb->users} u ON u.ID = um.user_id
         WHERE u.ID IS NULL
     ");
 
-
-    // Get all public taxonomies
     $taxonomies = get_taxonomies(['public' => true]);
-
-    // Include product taxonomies
     $product_taxonomies = get_object_taxonomies('product', 'names');
     $taxonomies = array_merge($taxonomies, $product_taxonomies);
     $taxonomies = array_unique($taxonomies);
 
     foreach ($taxonomies as $taxonomy) {
-        // Get all terms with our dummy marker
         $dummy_terms = get_terms([
             'taxonomy' => $taxonomy,
             'meta_key' => $meta_key,
@@ -164,48 +169,6 @@ function draxira_uninstall_cleanup()
         WHERE t.term_id IS NULL
     ");
 
-    $wpdb->delete(
-        $wpdb->comments,
-        ['comment_approved' => 'spam'],
-        ['%s']
-    );
-
-    // Delete all transients with 'draxira_' prefix
-    $wpdb->query(
-        $wpdb->prepare(
-            "DELETE FROM {$wpdb->options} 
-            WHERE option_name LIKE %s 
-            OR option_name LIKE %s",
-            '_transient_draxira_%',
-            '_transient_timeout_draxira_%'
-        )
-    );
-
-    // Delete any plugin options (add more if you have them)
-    delete_option('draxira_settings');
-    delete_option('draxira_version');
-
-
-    // Delete any remaining meta with our key (orphaned)
-    $wpdb->delete(
-        $wpdb->postmeta,
-        ['meta_key' => $meta_key],
-        ['%s']
-    );
-
-    $wpdb->delete(
-        $wpdb->usermeta,
-        ['meta_key' => $meta_key],
-        ['%s']
-    );
-
-    $wpdb->delete(
-        $wpdb->termmeta,
-        ['meta_key' => $meta_key],
-        ['%s']
-    );
-
-    // We can identify them by checking if the post meta exists or by title pattern
     $dummy_attachments = get_posts([
         'post_type' => 'attachment',
         'posts_per_page' => -1,
@@ -215,7 +178,6 @@ function draxira_uninstall_cleanup()
         'post_status' => 'inherit',
     ]);
 
-    // Also check for images with our naming pattern
     $pattern_attachments = get_posts([
         'post_type' => 'attachment',
         'posts_per_page' => -1,
@@ -232,42 +194,27 @@ function draxira_uninstall_cleanup()
         }
     }
 
-    // If WooCommerce was active, clean up product-related data
-    if (class_exists('WooCommerce')) {
-        // Delete product attributes that were created
-        $attribute_taxonomies = wc_get_attribute_taxonomies();
-        if (!empty($attribute_taxonomies)) {
-            foreach ($attribute_taxonomies as $attribute) {
-                $taxonomy_name = wc_attribute_taxonomy_name($attribute->attribute_name);
-                $terms = get_terms([
-                    'taxonomy' => $taxonomy_name,
-                    'hide_empty' => false,
-                    'fields' => 'ids',
-                ]);
+    $wpdb->query(
+        $wpdb->prepare(
+            "DELETE FROM {$wpdb->options} 
+            WHERE option_name LIKE %s 
+            OR option_name LIKE %s",
+            '_transient_draxira_%',
+            '_transient_timeout_draxira_%'
+        )
+    );
 
-                if (!is_wp_error($terms) && !empty($terms)) {
-                    foreach ($terms as $term_id) {
-                        wp_delete_term($term_id, $taxonomy_name);
-                    }
-                }
-            }
-        }
-    }
+    delete_option('draxira_settings');
+    delete_option('draxira_version');
 
-    // Delete any cached files in uploads directory
-    $upload_dir = wp_upload_dir();
-    $cache_dir = $upload_dir['basedir'] . '/draxira-cache';
+    $wpdb->delete($wpdb->postmeta, ['meta_key' => $meta_key], ['%s']);
+    $wpdb->delete($wpdb->usermeta, ['meta_key' => $meta_key], ['%s']);
+    $wpdb->delete($wpdb->termmeta, ['meta_key' => $meta_key], ['%s']);
 
-    // Use the new WP_Filesystem based recursive delete function
-    if (file_exists($cache_dir) && is_dir($cache_dir)) {
-        draxira_recursive_delete_with_wp_filesystem($cache_dir);
-    }
-
-    // Also clean up any image files that might have been uploaded but not attached
+    // delete uplpaded files
     $upload_dir = wp_upload_dir();
     $dummy_images_dir = $upload_dir['basedir'];
 
-    // Look for dummy images in the uploads directory
     $dummy_files = glob($dummy_images_dir . '/dummy_content_filler_img_*.*');
     if (!empty($dummy_files) && is_array($dummy_files)) {
         foreach ($dummy_files as $file) {
@@ -277,7 +224,6 @@ function draxira_uninstall_cleanup()
         }
     }
 
-    // Look for product dummy images
     $dummy_product_files = glob($dummy_images_dir . '/dummy_content_filler_product_img_*.*');
     if (!empty($dummy_product_files) && is_array($dummy_product_files)) {
         foreach ($dummy_product_files as $file) {
@@ -286,13 +232,15 @@ function draxira_uninstall_cleanup()
             }
         }
     }
+
+    // Clean up cache directory
+    $cache_dir = $upload_dir['basedir'] . '/draxira-cache';
+    if (file_exists($cache_dir) && is_dir($cache_dir)) {
+        draxira_recursive_delete_with_wp_filesystem($cache_dir);
+    }
 }
 
-// RUN THE CLEANUP
-
-// Check if we're in multisite environment
 if (is_multisite()) {
-    // Get all blog IDs
     $blog_ids = get_sites(['fields' => 'ids']);
 
     foreach ($blog_ids as $blog_id) {
