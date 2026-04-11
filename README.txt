@@ -125,15 +125,14 @@ Draxira is designed to be lightweight and efficient. It only loads its scripts o
 
 = Can I contribute or report issues? =
 
-Yes! Please visit our [GitHub repository](https://github.com/microcodes/draxira) for issues, feature requests, and contributions.
+Yes! Please visit our [GitHub repository](https://github.com/iamshimantadas/draxira) for issues, feature requests, and contributions.
 
 == Screenshots ==
 
 1. **Post Types Generation Interface** - Configure posts, pages, and custom post types
-2. **Users Generation Interface** - Create dummy users with custom roles and meta fields
-3. **Products Generation Interface** - Generate WooCommerce products with categories and attributes
-4. **Manage Dummy Posts** - View, edit, and delete generated posts
-5. **Custom Field Configuration** - Map ACF/CMB2 fields to realistic data types
+2. **Post Meta & Taxonomy** - Configure post-meta and taxonomy which assigned to post-type, their assigned per post.
+3. **User Generation Interface** - Generate users along with user-meta with custom options.
+4. **WooCommerce Products Generation Interface** - Generate woocommerce products with author, product meta, taxonomy and custom fields.
 
 == Changelog ==
 
@@ -173,7 +172,7 @@ Initial release of Draxira – Dummy Content Generator. Start generating realist
 
 = Plugin Support =
 
-For support, feature requests, or bug reports, please visit our [support forum](https://wordpress.org/support/plugin/draxira) or [GitHub repository](https://github.com/microcodes/draxira).
+For support, feature requests, or bug reports, please visit our [support forum](https://wordpress.org/support/plugin/draxira) or [GitHub repository](https://github.com/iamshimantadas/draxira).
 
 = Credits =
 

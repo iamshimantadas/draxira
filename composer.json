@@ -17,7 +17,7 @@
         }
     ],
     "require": {
-        "php": ">=7.2",
+        "php": ">=7.4",
         "fakerphp/faker": "^1.23",
         "composer/installers": "^1.0 || ^2.0"
     },
@@ -36,7 +36,7 @@
         },
         "preferred-install": "dist",
         "platform": {
-            "php": "7.2"
+            "php": "7.4"
         }
     },
     "scripts": {

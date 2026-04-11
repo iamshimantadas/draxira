@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Draxira – Dummy Content Generator
- * Plugin URI: 
+ * Plugin URI: https://wordpress.org/plugins/draxira/
  * Description: Generate dummy posts, pages, custom post types, users, and WooCommerce products for testing WordPress websites instantly.
  * Version: 1.0.0
  * Author: microcodes
