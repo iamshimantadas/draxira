@@ -1,6 +1,6 @@
 /**
  * Draxira Plugin Admin Styles
- * Version: 1.0.0
+ * Version: 1.0.2
  */
 
 /* Main container */
@@ -324,4 +324,22 @@
     float: none;
     margin: 0 auto 10px;
     visibility: visible;
+}
+
+
+.posts-checkboxes::-webkit-scrollbar {
+    width: 8px;
+}
+
+.posts-checkboxes::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.posts-checkboxes::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.posts-checkboxes::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }

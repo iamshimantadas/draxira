@@ -763,33 +763,33 @@ class Draxira_Products
     private function mc_drax_attach_featured_image_from_local($product_id)
     {
         $image_dir = DRAXIRA_PLUGIN_DIR . 'assets/img/product_featured/';
-        
+
         if (!file_exists($image_dir)) {
             return false;
         }
-        
+
         // Get all jpg images from the folder
         $images = glob($image_dir . '*.jpg');
-        
+
         if (empty($images)) {
             return false;
         }
-        
+
         // Select a random image
         $random_image = $images[array_rand($images)];
         $filename = basename($random_image);
-        
+
         // Check if image already exists in media library
         $existing_image = $this->mc_drax_get_attachment_by_title($filename);
-        
+
         if ($existing_image) {
             set_post_thumbnail($product_id, $existing_image);
             return true;
         }
-        
+
         // Upload image to media library
         $upload_file = wp_upload_bits($filename, null, file_get_contents($random_image));
-        
+
         if (!$upload_file['error']) {
             $wp_filetype = wp_check_filetype($filename, null);
             $attachment = [
@@ -798,9 +798,9 @@ class Draxira_Products
                 'post_content' => '',
                 'post_status' => 'inherit'
             ];
-            
+
             $attachment_id = wp_insert_attachment($attachment, $upload_file['file']);
-            
+
             if (!is_wp_error($attachment_id)) {
                 require_once(ABSPATH . 'wp-admin/includes/image.php');
                 $attachment_data = wp_generate_attachment_metadata($attachment_id, $upload_file['file']);
@@ -809,7 +809,7 @@ class Draxira_Products
                 return true;
             }
         }
-        
+
         return false;
     }
 

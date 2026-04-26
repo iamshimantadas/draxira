@@ -3,7 +3,7 @@
  * Plugin Name: Draxira – Dummy Content Generator
  * Plugin URI: https://wordpress.org/plugins/draxira/
  * Description: Generate dummy posts, pages, custom post types, users, and WooCommerce products for testing WordPress websites instantly.
- * Version: 1.0.0
+ * Version: 1.0.2
  * Author: microcodes
  * Author URI: https://microcodes.in
  * License: GPL v2 or later
@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
 }
 
 // plugin constants
-define('DRAXIRA_VERSION', '1.0.0');
+define('DRAXIRA_VERSION', '1.0.2');
 define('DRAXIRA_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DRAXIRA_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('DRAXIRA_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -34,6 +34,9 @@ if (file_exists($composer_autoload)) {
 require_once DRAXIRA_PLUGIN_DIR . 'includes/class-draxira.php';
 require_once DRAXIRA_PLUGIN_DIR . 'includes/class-draxira-users.php';
 require_once DRAXIRA_PLUGIN_DIR . 'includes/class-draxira-products.php';
+require_once DRAXIRA_PLUGIN_DIR . 'includes/class-draxira-comments.php';
+require_once DRAXIRA_PLUGIN_DIR . 'includes/class-draxira-taxonomies.php';
+
 
 // Initialize plugin
 add_action('plugins_loaded', function () {
@@ -42,6 +45,12 @@ add_action('plugins_loaded', function () {
 
     // Initialize users class
     Draxira_Users::get_instance();
+
+    // Initialize comments class
+    Draxira_Comments::get_instance();
+
+    // Initialize taxonomies class
+    Draxira_Taxonomies::get_instance();
 
     // If woocommerce enabled
     if (class_exists('WooCommerce')) {

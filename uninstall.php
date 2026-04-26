@@ -11,7 +11,7 @@
  * - Plugin transients and options
  * 
  * @package Draxira
- * @since 1.0.0
+ * @since 1.0.1
  */
 
 // If uninstall not called from WordPress, exit
@@ -27,7 +27,7 @@ if (!current_user_can('activate_plugins')) {
 /**
  * Recursively delete a directory using WP_Filesystem
  *
- * @since 1.0.0
+ * @since 1.0.1
  * @param string $dir Directory path to delete
  * @return bool True on success, false on failure
  */
@@ -70,7 +70,7 @@ function draxira_recursive_delete_with_wp_filesystem($dir)
 /**
  * Main uninstall function
  * 
- * @since 1.0.0
+ * @since 1.0.1
  */
 function draxira_uninstall_cleanup()
 {

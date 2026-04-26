@@ -4,7 +4,7 @@ Tags: dummy content, dummy posts, test data, dummy users, content generator
 Requires at least: 5.0
 Tested up to: 6.9
 Requires PHP: 7.2
-Stable tag: 1.0.0
+Stable tag: 1.0.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -125,7 +125,7 @@ Draxira is designed to be lightweight and efficient. It only loads its scripts o
 
 = Can I contribute or report issues? =
 
-Yes! Please visit our [GitHub repository](https://github.com/iamshimantadas/draxira) for issues, feature requests, and contributions.
+Yes! Please visit our [GitHub repository](https://github.com/microcodes/draxira) for issues, feature requests, and contributions.
 
 == Screenshots ==
 
@@ -135,6 +135,16 @@ Yes! Please visit our [GitHub repository](https://github.com/iamshimantadas/drax
 4. **WooCommerce Products Generation Interface** - Generate woocommerce products with author, product meta, taxonomy and custom fields.
 
 == Changelog ==
+
+= 1.0.2 =
+* Bug fixes
+
+= 1.0.1 =
+* Functional Upgrade
+* **Taxonomies**
+  - Generate dummy taxonomies against post-type.
+* **Comments**
+  - Generate dummy comments against selected posts.
 
 = 1.0.0 =
 * Initial release
@@ -165,6 +175,12 @@ Yes! Please visit our [GitHub repository](https://github.com/iamshimantadas/drax
 
 == Upgrade Notice ==
 
+= 1.0.2 = 
+minor bug fixes
+
+= 1.0.1 =
+Generate dummy taxonomies against post-type. Generate dummy comments against selected posts.
+
 = 1.0.0 =
 Initial release of Draxira – Dummy Content Generator. Start generating realistic dummy content for your WordPress site today!
 
@@ -172,7 +188,7 @@ Initial release of Draxira – Dummy Content Generator. Start generating realist
 
 = Plugin Support =
 
-For support, feature requests, or bug reports, please visit our [support forum](https://wordpress.org/support/plugin/draxira) or [GitHub repository](https://github.com/iamshimantadas/draxira).
+For support, feature requests, or bug reports, please visit our [support forum](https://wordpress.org/support/plugin/draxira) or [GitHub repository](https://github.com/microcodes/draxira).
 
 = Credits =
 
