@@ -109,6 +109,27 @@ function draxira_uninstall_cleanup()
         WHERE p.ID IS NULL
     ");
 
+    // Dummy WooCommerce orders (CRUD API: works with legacy and HPOS storage)
+    if (function_exists('wc_get_orders')) {
+        $dummy_orders = wc_get_orders([
+            'limit' => -1,
+            'return' => 'ids',
+            'meta_query' => [
+                [
+                    'key' => $meta_key,
+                    'value' => '1',
+                ],
+            ],
+        ]);
+
+        foreach ($dummy_orders as $order_id) {
+            $order = wc_get_order($order_id);
+            if ($order && '1' === (string) $order->get_meta($meta_key, true)) {
+                $order->delete(true);
+            }
+        }
+    }
+
     $dummy_users = get_users([
         'meta_key' => $meta_key,
         'meta_value' => '1',
@@ -204,6 +225,7 @@ function draxira_uninstall_cleanup()
         )
     );
 
+    delete_option('draxira_media_registry');
     delete_option('draxira_settings');
     delete_option('draxira_version');
 

@@ -91,6 +91,13 @@ class Draxira_Comments
 
         // Enqueue scripts
         add_action('admin_enqueue_scripts', [$this, 'mc_drax_enqueue_comments_scripts']);
+
+        // Background (AJAX batch) generation
+        Draxira_Batch::register('comments', [
+            'prepare' => [$this, 'batch_prepare'],
+            'step' => [$this, 'batch_step'],
+            'finish' => [$this, 'batch_finish'],
+        ]);
     }
 
     /**
@@ -287,69 +294,195 @@ class Draxira_Comments
      */
     private function mc_drax_generate_dummy_comments()
     {
-        $comment_type = sanitize_text_field($_POST['comment_type'] ?? 'standard');
-        $comments_per_post = intval($_POST['comments_per_post'] ?? 3);
-        $comments_per_post = min($comments_per_post, 20); // Limit to 20 per post
+        // Fallback for browsers without JavaScript: run the whole job in this request.
+        $result = Draxira_Batch::run_sync('comments', wp_unslash($_POST)); // phpcs:ignore WordPress.Security.NonceVerification -- verified in mc_drax_handle_comments_actions().
 
-        $selected_posts = [];
-        if (isset($_POST['selected_posts']) && is_array($_POST['selected_posts'])) {
-            $selected_posts = array_map('intval', $_POST['selected_posts']);
-        }
-
-        if (empty($selected_posts)) {
-            set_transient('draxira_comments_results', [
-                'message' => __('Please select at least one post to generate comments.', 'draxira'),
-                'type' => 'error'
-            ], 30);
-            wp_safe_redirect(admin_url('admin.php?page=draxira-comments'));
-            exit;
-        }
-
-        $results = ['success' => 0, 'failed' => 0];
-        $faker = $this->mc_drax_get_faker();
-        $authors = $this->mc_drax_get_comment_authors();
-        $author_ids = array_keys($authors);
-
-        foreach ($selected_posts as $post_id) {
-            $post = get_post($post_id);
-            if (!$post) {
-                continue;
-            }
-
-            // Check if comments are open for this post
-            if (!comments_open($post_id) && $comment_type !== 'closed') {
-                // Force open comments temporarily if needed
-                add_filter('comments_open', '__return_true', 10, 2);
-            }
-
-            for ($i = 0; $i < $comments_per_post; $i++) {
-                $comment_data = $this->mc_drax_create_dummy_comment($post_id, $comment_type, $author_ids, $faker);
-
-                if ($comment_data && !is_wp_error($comment_data)) {
-                    $results['success']++;
-                } else {
-                    $results['failed']++;
-                }
-            }
-
-            // Restore comments open status
-            if (!comments_open($post_id) && $comment_type !== 'closed') {
-                remove_filter('comments_open', '__return_true', 10);
-            }
-        }
-
-        set_transient('draxira_comments_results', [
-            'message' => sprintf(
-                /* translators: %1$d: number of generated comments, %2$d: number of failures */
-                __('Successfully generated %1$d comments. Failed: %2$d', 'draxira'),
-                $results['success'],
-                $results['failed']
-            ),
-            'type' => 'success'
-        ], 30);
+        set_transient('draxira_comments_results', $result, 30);
 
         wp_safe_redirect(admin_url('admin.php?page=draxira-comments'));
         exit;
+    }
+
+    /**
+     * Comment status choices (value => label).
+     *
+     * @since 1.0.8
+     * @return array
+     */
+    public static function status_choices()
+    {
+        return [
+            'approved' => __('Approved', 'draxira'),
+            'pending' => __('Pending (awaiting moderation)', 'draxira'),
+            'spam' => __('Spam', 'draxira'),
+            'trash' => __('Trash', 'draxira'),
+            'random' => __('Random mix of statuses', 'draxira'),
+        ];
+    }
+
+    /**
+     * Resolve a status choice to the value wp_insert_comment() expects.
+     *
+     * @since 1.0.8
+     * @param string $choice Status choice.
+     * @return string 1|0|spam|trash
+     */
+    private function mc_drax_resolve_comment_status($choice)
+    {
+        if ('random' === $choice) {
+            $choice = Draxira_Helpers::weighted_pick([
+                'approved' => 65,
+                'pending' => 20,
+                'spam' => 10,
+                'trash' => 5,
+            ]);
+        }
+
+        $map = ['approved' => '1', 'pending' => '0', 'spam' => 'spam', 'trash' => 'trash'];
+        return isset($map[$choice]) ? $map[$choice] : '1';
+    }
+
+    /**
+     * Batch: validate the form.
+     *
+     * @since 1.0.8
+     * @param array $data Unslashed form data.
+     * @return array|WP_Error
+     */
+    public function batch_prepare($data)
+    {
+        $posts = [];
+        if (isset($data['selected_posts']) && is_array($data['selected_posts'])) {
+            $posts = array_values(array_unique(array_filter(array_map('intval', $data['selected_posts']))));
+        }
+
+        if (empty($posts)) {
+            return new WP_Error('draxira_posts', __('Please select at least one post to generate comments.', 'draxira'));
+        }
+
+        $per_post = max(1, min(intval($data['comments_per_post'] ?? 3), 20));
+        $type = in_array(($data['comment_type'] ?? 'standard'), ['standard', 'reply'], true) ? $data['comment_type'] : 'standard';
+        $status = isset($data['comment_status'], self::status_choices()[$data['comment_status']]) ? $data['comment_status'] : 'approved';
+
+        return [
+            'total' => count($posts) * $per_post,
+            'label' => __('Generating comments…', 'draxira'),
+            'config' => [
+                'posts' => $posts,
+                'per_post' => $per_post,
+                'type' => $type,
+                'status' => $status,
+            ],
+            'state' => [],
+        ];
+    }
+
+    /**
+     * Batch: create one comment.
+     *
+     * @since 1.0.8
+     * @param array $job   Job (by reference).
+     * @param int   $index Unit index.
+     * @return bool
+     */
+    public function batch_step(&$job, $index)
+    {
+        $c = $job['config'];
+        $post_id = $c['posts'][intdiv($index, $c['per_post'])] ?? 0;
+        if (!$post_id || !get_post($post_id)) {
+            return false;
+        }
+
+        $author_ids = array_keys($this->mc_drax_get_comment_authors());
+        $comment_id = $this->mc_drax_create_dummy_comment(
+            $post_id,
+            $c['type'],
+            $author_ids,
+            $this->mc_drax_get_faker(),
+            $c['status'],
+            $index % $c['per_post']
+        );
+
+        return $comment_id && !is_wp_error($comment_id);
+    }
+
+    /**
+     * Batch: final notice.
+     *
+     * @since 1.0.8
+     * @param array $job Job.
+     * @return array
+     */
+    public function batch_finish($job)
+    {
+        return [
+            'message' => sprintf(
+                /* translators: %1$d: number of generated comments, %2$d: number of failures */
+                __('Successfully generated %1$d comments. Failed: %2$d', 'draxira'),
+                $job['success'],
+                $job['failed']
+            ),
+            'type' => 'success',
+        ];
+    }
+
+    /**
+     * Depth of a comment inside its thread (top level = 1).
+     *
+     * @since 1.0.8
+     * @param WP_Comment $comment Comment.
+     * @return int
+     */
+    private function mc_drax_comment_depth($comment)
+    {
+        $depth = 1;
+        $guard = 0;
+        $parent_id = (int) $comment->comment_parent;
+        while ($parent_id && $guard < 50) {
+            $parent = get_comment($parent_id);
+            if (!$parent) {
+                break;
+            }
+            $depth++;
+            $parent_id = (int) $parent->comment_parent;
+            $guard++;
+        }
+        return $depth;
+    }
+
+    /**
+     * Pick the comment a new reply should answer. Any approved comment of the post can be
+     * chosen - including other replies - so threads grow several levels deep, as long as the
+     * site's "nested comments" depth limit is respected.
+     *
+     * @since 1.0.8
+     * @param int $post_id Post ID.
+     * @return WP_Comment|null
+     */
+    private function mc_drax_pick_parent_comment($post_id)
+    {
+        $candidates = get_comments([
+            'post_id' => $post_id,
+            'status' => 'approve',
+            'number' => 100,
+            'orderby' => 'comment_ID',
+            'order' => 'DESC',
+        ]);
+
+        if (empty($candidates)) {
+            return null;
+        }
+
+        $max_depth = get_option('thread_comments') ? max(2, (int) get_option('thread_comments_depth', 5)) : 5;
+
+        $eligible = [];
+        foreach ($candidates as $candidate) {
+            if ($this->mc_drax_comment_depth($candidate) < $max_depth) {
+                $eligible[] = $candidate;
+            }
+        }
+
+        return $eligible ? $eligible[array_rand($eligible)] : null;
     }
 
     /**
@@ -357,19 +490,30 @@ class Draxira_Comments
      *
      * @since 1.0.0
      * @access private
-     * @param int     $post_id      Post ID
-     * @param string  $comment_type Comment type (standard, reply)
-     * @param array   $author_ids   Available author IDs
-     * @param object  $faker        Faker instance
+     * @param int     $post_id       Post ID
+     * @param string  $comment_type  Comment type (standard, reply)
+     * @param array   $author_ids    Available author IDs
+     * @param object  $faker         Faker instance
+     * @param string  $status_choice approved|pending|spam|trash|random
+     * @param int     $position      Position of this comment within its post (0 = first)
      * @return int|false Comment ID on success, false on failure
      */
-    private function mc_drax_create_dummy_comment($post_id, $comment_type, $author_ids, $faker)
+    private function mc_drax_create_dummy_comment($post_id, $comment_type, $author_ids, $faker, $status_choice = 'approved', $position = 0)
     {
         $post = get_post($post_id);
         $is_product = ($post && $post->post_type === 'product');
 
-        // Randomly select an author
-        $author_id = !empty($author_ids) ? $author_ids[array_rand($author_ids)] : 0;
+        // Reply mode: ~75% of comments answer an existing comment or reply (the first comment on an empty post is always top level).
+        $parent = null;
+        if ($comment_type === 'reply' && !$is_product && wp_rand(1, 4) > 1) {
+            $parent = $this->mc_drax_pick_parent_comment($post_id);
+        }
+
+        // Author: mostly registered users, sometimes guests. A reply is written by someone other than the author of
+        // the comment it answers (when another candidate exists).
+        $parent_user = $parent ? (int) $parent->user_id : 0;
+        $pool = array_values(array_diff($author_ids, $parent_user ? [$parent_user] : []));
+        $author_id = (!empty($pool) && wp_rand(1, 10) > 3) ? $pool[array_rand($pool)] : 0;
 
         $author_name = '';
         $author_email = '';
@@ -379,6 +523,8 @@ class Draxira_Comments
             if ($author_user) {
                 $author_name = $author_user->display_name;
                 $author_email = $author_user->user_email;
+            } else {
+                $author_id = 0;
             }
         }
 
@@ -387,6 +533,11 @@ class Draxira_Comments
         }
         if (empty($author_email)) {
             $author_email = $faker ? $faker->email() : 'dummy' . wp_rand(100, 999) . '@example.com';
+        }
+
+        // Guests must differ from the parent's author too.
+        if ($parent && !$author_id && strtolower($author_email) === strtolower($parent->comment_author_email)) {
+            $author_email = 'guest' . wp_rand(100, 9999) . '@example.com';
         }
 
         $comment_content = $this->mc_drax_generate_comment_content($faker);
@@ -398,24 +549,14 @@ class Draxira_Comments
             'comment_author_url' => $faker ? $faker->url() : '',
             'comment_content'    => $comment_content,
             'comment_type'       => $is_product ? 'review' : 'comment',
-            'comment_approved'   => 1,
+            'comment_approved'   => $this->mc_drax_resolve_comment_status($status_choice),
             'user_id'            => $author_id,
             'comment_date'       => current_time('mysql'),
             'comment_date_gmt'   => current_time('mysql', 1),
         ];
 
-        // For reply comments
-        if ($comment_type === 'reply' && !$is_product) {
-            $parent_comments = get_comments([
-                'post_id' => $post_id,
-                'number'  => 5,
-                'status'  => 'approve',
-            ]);
-
-            if (!empty($parent_comments)) {
-                $random_parent = $parent_comments[array_rand($parent_comments)];
-                $comment_data['comment_parent'] = $random_parent->comment_ID;
-            }
+        if ($parent) {
+            $comment_data['comment_parent'] = (int) $parent->comment_ID;
         }
 
         $comment_id = wp_insert_comment($comment_data);
@@ -501,6 +642,8 @@ class Draxira_Comments
             'meta_key' => DRAXIRA_META_KEY,
             'meta_value' => '1',
             'fields' => 'ids',
+            'type__in' => ['comment', 'review'],
+            'status' => ['approve', 'hold', 'spam', 'trash'],
             'number' => 0, // Get all
         ]);
 
@@ -626,8 +769,10 @@ class Draxira_Comments
         $args = [
             'meta_key' => DRAXIRA_META_KEY,
             'meta_value' => '1',
-            'number' => 100,
-            'status' => 'approve',
+            'number' => 20000,
+            'type__in' => ['comment', 'review'],
+            // Every status: approved, pending, spam and trash.
+            'status' => ['approve', 'hold', 'spam', 'trash'],
         ];
 
         $dummy_comments = get_comments($args);
@@ -646,6 +791,8 @@ class Draxira_Comments
                     <th><?php esc_html_e('Author', 'draxira'); ?></th>
                     <th><?php esc_html_e('Comment', 'draxira'); ?></th>
                     <th><?php esc_html_e('Post', 'draxira'); ?></th>
+                    <th><?php esc_html_e('Status', 'draxira'); ?></th>
+                    <th><?php esc_html_e('Reply to', 'draxira'); ?></th>
                     <th><?php esc_html_e('Date', 'draxira'); ?></th>
                     <th><?php esc_html_e('Actions', 'draxira'); ?></th>
                 </tr>
@@ -676,6 +823,17 @@ class Draxira_Comments
                                 <?php echo esc_html($post_title); ?>
                             </a>
                         </td>
+                        <td>
+                            <?php
+                            $c_status = wp_get_comment_status($comment);
+                            $c_labels = ['approved' => __('Approved', 'draxira'), 'unapproved' => __('Pending', 'draxira'), 'spam' => __('Spam', 'draxira'), 'trash' => __('Trash', 'draxira')];
+                            $c_class = 'approved' === $c_status ? 'is-good' : ('unapproved' === $c_status ? 'is-warn' : 'is-muted');
+                            echo '<span class="dx-badge ' . esc_attr($c_class) . '">' . esc_html($c_labels[$c_status] ?? ucfirst((string) $c_status)) . '</span>';
+                            ?>
+                        </td>
+                        <td>
+                            <?php echo $comment->comment_parent ? '#' . esc_html($comment->comment_parent) : '&mdash;'; ?>
+                        </td>
                         <td><?php echo esc_html(get_comment_date('Y-m-d H:i', $comment)); ?></td>
                         <td>
                             <a href="<?php echo esc_url(admin_url('comment.php?action=editcomment&c=' . $comment->comment_ID)); ?>"
@@ -704,6 +862,7 @@ class Draxira_Comments
         ?>
         <div class="wrap draxira">
             <h1><?php esc_html_e('Draxira – Dummy Content Generator - Comments', 'draxira'); ?></h1>
+            <?php Draxira_Helpers::render_nav('draxira-comments'); ?>
 
             <?php
             $results = get_transient('draxira_comments_results');
@@ -722,7 +881,7 @@ class Draxira_Comments
 
             <!-- Generate Comments Tab -->
             <div id="generate-comments-tab" class="tab-content active">
-                <form method="post" action="" id="generate-comments-form">
+                <form method="post" action="" id="generate-comments-form" data-dx-batch="comments">
                     <?php wp_nonce_field('generate_dummy_comments'); ?>
 
                     <table class="form-table">
@@ -767,7 +926,20 @@ class Draxira_Comments
                                     <option value="reply"><?php esc_html_e('Include Reply Comments', 'draxira'); ?></option>
                                 </select>
                                 <p class="description">
-                                    <?php esc_html_e('"Include Reply Comments" will also add nested replies to existing comments.', 'draxira'); ?>
+                                    <?php esc_html_e('"Include Reply Comments" adds replies to existing comments and replies to other replies (threads up to your Settings → Discussion depth), written by a different author than the comment they answer.', 'draxira'); ?>
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><?php esc_html_e('Comment Status', 'draxira'); ?></th>
+                            <td>
+                                <select name="comment_status" id="comment-status">
+                                    <?php foreach (self::status_choices() as $status_value => $status_label): ?>
+                                        <option value="<?php echo esc_attr($status_value); ?>"><?php echo esc_html($status_label); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <p class="description">
+                                    <?php esc_html_e('Pending comments appear in Comments → Pending for moderation. Replies are always attached to approved comments.', 'draxira'); ?>
                                 </p>
                             </td>
                         </tr>

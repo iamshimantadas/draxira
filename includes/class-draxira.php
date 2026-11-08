@@ -122,6 +122,13 @@ class Draxira
         add_action('wp_ajax_draxira_get_dummy_posts', [$this, 'mc_drax_ajax_get_dummy_posts']);
         add_action('wp_ajax_draxira_get_authors', [$this, 'mc_drax_ajax_get_authors']);
 
+        // Background (AJAX batch) generation
+        Draxira_Batch::register('posts', [
+            'prepare' => [$this, 'batch_prepare'],
+            'step' => [$this, 'batch_step'],
+            'finish' => [$this, 'batch_finish'],
+        ]);
+
         // Cleanup hooks for permanent deletion
         add_action('before_delete_post', [$this, 'mc_drax_cleanup_post_meta'], 10, 1);
 
@@ -313,83 +320,116 @@ class Draxira
      */
     private function mc_drax_generate_dummy_posts()
     {
-        $post_type = sanitize_text_field($_POST['post_type'] ?? 'post');
-        $count = intval($_POST['post_count'] ?? 5);
-        $with_images = isset($_POST['with_images']);
-        $create_excerpt = isset($_POST['create_excerpt']);
-        $post_author = intval($_POST['post_author'] ?? get_current_user_id());
+        // Fallback for browsers without JavaScript: run the whole job in this request.
+        $result = Draxira_Batch::run_sync('posts', wp_unslash($_POST)); // phpcs:ignore WordPress.Security.NonceVerification -- verified in mc_drax_handle_actions().
 
-        // Get post meta configurations
-        $post_meta_config = [];
-        if (isset($_POST['post_meta']) && is_array($_POST['post_meta'])) {
-            foreach ($_POST['post_meta'] as $meta_key => $config) {
-                if (!empty($config['type'])) {
-                    $post_meta_config[$meta_key] = [
-                        'type' => sanitize_text_field($config['type'])
-                    ];
-                }
-            }
-        }
-
-        // Get taxonomy configurations
-        $taxonomy_config = [];
-        if (isset($_POST['taxonomies']) && is_array($_POST['taxonomies'])) {
-            foreach ($_POST['taxonomies'] as $taxonomy => $config) {
-                if (isset($config['create']) && $config['create'] === 'yes') {
-                    $taxonomy_config[$taxonomy] = [
-                        'create' => 'yes',
-                        'assign' => isset($config['assign']) ? intval($config['assign']) : 2
-                    ];
-                }
-            }
-        }
-
-        $results = ['success' => 0, 'failed' => 0, 'taxonomies_created' => 0];
-
-        // First create taxonomies if requested
-        $created_terms = [];
-        if (!empty($taxonomy_config)) {
-            foreach ($taxonomy_config as $taxonomy => $config) {
-                // Always create 10 terms for each taxonomy that has create enabled
-                $terms = $this->mc_drax_create_dummy_terms($taxonomy, 10);
-                $created_terms[$taxonomy] = $terms;
-                $results['taxonomies_created'] += count($terms);
-            }
-        }
-
-        // Generate posts
-        for ($i = 0; $i < $count; $i++) {
-            $post_id = $this->mc_drax_create_dummy_post(
-                $post_type,
-                $with_images,
-                $create_excerpt,
-                $post_author,
-                $post_meta_config,
-                $created_terms,
-                $taxonomy_config
-            );
-
-            if ($post_id && !is_wp_error($post_id)) {
-                $results['success']++;
-            } else {
-                $results['failed']++;
-            }
-        }
-
-        // Store results in transient for display
-        set_transient('draxira_results', [
-            'message' => sprintf(
-                /* translators: %1$d: number of generated posts, %2$s: singular/plural of post, %3$d: number of taxonomy terms created, %4$d: number of failures */
-                __('Successfully generated %1$d %2$s with %3$d taxonomy terms. Failed: %4$d', 'draxira'),
-                $results['success'],
-                _n('post', 'posts', $results['success'], 'draxira'),
-                $results['taxonomies_created'],
-                $results['failed']
-            )
-        ], 30);
+        set_transient('draxira_results', $result, 30);
 
         wp_safe_redirect(admin_url('admin.php?page=draxira'));
         exit;
+    }
+
+    /**
+     * Batch: validate the form and create the shared taxonomy terms.
+     *
+     * @since 1.0.8
+     * @param array $data Unslashed form data.
+     * @return array|WP_Error
+     */
+    public function batch_prepare($data)
+    {
+        $post_type = sanitize_key($data['post_type'] ?? 'post');
+        if (!post_type_exists($post_type) || in_array($post_type, ['attachment', 'product'], true)) {
+            return new WP_Error('draxira_post_type', __('Invalid post type selected.', 'draxira'));
+        }
+
+        $count = max(1, min(intval($data['post_count'] ?? 5), 500));
+
+        $taxonomy_config = [];
+        if (isset($data['taxonomies']) && is_array($data['taxonomies'])) {
+            foreach ($data['taxonomies'] as $taxonomy => $config) {
+                if (isset($config['create']) && $config['create'] === 'yes' && taxonomy_exists($taxonomy)) {
+                    $taxonomy_config[sanitize_key($taxonomy)] = [
+                        'create' => 'yes',
+                        'assign' => isset($config['assign']) ? intval($config['assign']) : 2,
+                    ];
+                }
+            }
+        }
+
+        // Terms are created once, up front, and shared by every post of this run.
+        $created_terms = [];
+        $terms_total = 0;
+        foreach ($taxonomy_config as $taxonomy => $config) {
+            $terms = $this->mc_drax_create_dummy_terms($taxonomy, 10);
+            $created_terms[$taxonomy] = $terms;
+            $terms_total += count($terms);
+        }
+
+        $type_obj = get_post_type_object($post_type);
+
+        return [
+            'total' => $count,
+            'label' => sprintf(
+                /* translators: %s: post type label */
+                __('Generating %s…', 'draxira'),
+                $type_obj ? $type_obj->labels->name : $post_type
+            ),
+            'config' => [
+                'post_type' => $post_type,
+                'with_images' => !empty($data['with_images']),
+                'create_excerpt' => !empty($data['create_excerpt']),
+                'post_author' => intval($data['post_author'] ?? get_current_user_id()),
+                'status' => sanitize_key($data['post_status'] ?? 'publish'),
+                'meta' => Draxira_Fields::parse_config($data['post_meta'] ?? []),
+                'taxonomy' => $taxonomy_config,
+            ],
+            'state' => ['created_terms' => $created_terms, 'terms_total' => $terms_total],
+        ];
+    }
+
+    /**
+     * Batch: create one post.
+     *
+     * @since 1.0.8
+     * @param array $job   Job (by reference).
+     * @param int   $index Unit index.
+     * @return bool
+     */
+    public function batch_step(&$job, $index)
+    {
+        $c = $job['config'];
+        $post_id = $this->mc_drax_create_dummy_post(
+            $c['post_type'],
+            $c['with_images'],
+            $c['create_excerpt'],
+            $c['post_author'],
+            $c['meta'],
+            $job['state']['created_terms'],
+            $c['taxonomy'],
+            $c['status']
+        );
+
+        return $post_id && !is_wp_error($post_id);
+    }
+
+    /**
+     * Batch: final notice.
+     *
+     * @since 1.0.8
+     * @param array $job Job.
+     * @return string
+     */
+    public function batch_finish($job)
+    {
+        return sprintf(
+            /* translators: %1$d: number of generated posts, %2$s: singular/plural of post, %3$d: number of taxonomy terms created, %4$d: number of failures */
+            __('Successfully generated %1$d %2$s with %3$d taxonomy terms. Failed: %4$d', 'draxira'),
+            $job['success'],
+            _n('post', 'posts', $job['success'], 'draxira'),
+            $job['state']['terms_total'],
+            $job['failed']
+        );
     }
 
     /**
@@ -413,7 +453,8 @@ class Draxira
         $post_author = 0,
         $meta_config = [],
         $created_terms = [],
-        $taxonomy_config = []
+        $taxonomy_config = [],
+        $status_choice = 'publish'
     ) {
         $faker = $this->mc_drax_get_faker();
 
@@ -425,10 +466,12 @@ class Draxira
         $post_data = [
             'post_title' => $faker ? $faker->sentence(6) : 'Dummy Post ' . time() . ' ' . wp_rand(1000, 9999),
             'post_content' => $faker ? $faker->paragraphs(3, true) : 'This is dummy content for testing purposes.',
-            'post_status' => 'publish',
             'post_type' => $post_type,
             'post_author' => $post_author,
         ];
+
+        // Status: publish, draft, pending, private, scheduled or a random mix.
+        $post_data = array_merge($post_data, Draxira_Helpers::resolve_post_status($status_choice));
 
         // Add excerpt if requested
         if ($create_excerpt) {
@@ -466,11 +509,12 @@ class Draxira
             }
 
             // Add configured post meta
+            $object = ['type' => 'post', 'id' => $post_id, 'post_type' => $post_type];
+            $simple = function ($type) {
+                return $this->mc_drax_generate_faker_value($type);
+            };
             foreach ($meta_config as $meta_key => $config) {
-                $meta_value = $this->mc_drax_generate_faker_value($config['type']);
-                if ($meta_value !== '') {
-                    update_post_meta($post_id, $meta_key, $meta_value);
-                }
+                Draxira_Fields::fill($object, $meta_key, $config, $simple);
             }
         }
 
@@ -621,53 +665,20 @@ class Draxira
      */
     private function mc_drax_attach_featured_image($post_id)
     {
-        $image_dir = DRAXIRA_PLUGIN_DIR . 'assets/img/';
+        $attachment_id = Draxira_Helpers::import_random_image(
+            DRAXIRA_PLUGIN_DIR . 'assets/img/',
+            '/^dummy_content_filler_img_\d+\.(jpe?g|png|gif)$/i',
+            $post_id,
+            get_post_type($post_id),
+            'posts'
+        );
 
-        if (!file_exists($image_dir)) {
+        if (!$attachment_id) {
+            error_log('Draxira: featured image failed - ' . Draxira_Helpers::$image_error);
             return false;
         }
 
-        $images = glob($image_dir . 'dummy_content_filler_img_*.{jpg,jpeg,png,gif}', GLOB_BRACE);
-
-        if (empty($images)) {
-            return false;
-        }
-
-        $random_image = $images[array_rand($images)];
-        $filename = basename($random_image);
-
-        // Check if image already exists in media library using WP_Query (replaces deprecated get_page_by_title)
-        $existing_image = $this->mc_drax_get_attachment_by_title($filename);
-
-        if ($existing_image) {
-            set_post_thumbnail($post_id, $existing_image);
-            return true;
-        }
-
-        // Upload image to media library
-        $upload_file = wp_upload_bits($filename, null, file_get_contents($random_image));
-
-        if (!$upload_file['error']) {
-            $wp_filetype = wp_check_filetype($filename, null);
-            $attachment = [
-                'post_mime_type' => $wp_filetype['type'],
-                'post_title' => preg_replace('/\.[^.]+$/', '', $filename),
-                'post_content' => '',
-                'post_status' => 'inherit'
-            ];
-
-            $attachment_id = wp_insert_attachment($attachment, $upload_file['file']);
-
-            if (!is_wp_error($attachment_id)) {
-                require_once(ABSPATH . 'wp-admin/includes/image.php');
-                $attachment_data = wp_generate_attachment_metadata($attachment_id, $upload_file['file']);
-                wp_update_attachment_metadata($attachment_id, $attachment_data);
-                set_post_thumbnail($post_id, $attachment_id);
-                return true;
-            }
-        }
-
-        return false;
+        return (bool) set_post_thumbnail($post_id, $attachment_id);
     }
 
     /**
@@ -810,7 +821,7 @@ class Draxira
             'meta_key' => DRAXIRA_META_KEY,
             'meta_value' => '1',
             'fields' => 'ids',
-            'post_status' => 'any', // Include all statuses
+            'post_status' => Draxira_Helpers::all_post_statuses(), // Include every status (draft, pending, private, scheduled, trash ...)
         ];
 
         $dummy_posts = get_posts($args);
@@ -929,6 +940,11 @@ class Draxira
         // Get authors directly - no AJAX needed since we already have the data
         $authors = $this->mc_drax_get_authors();
 
+        $status_options = '';
+        foreach (Draxira_Helpers::post_status_choices(true) as $status_value => $status_label) {
+            $status_options .= '<option value="' . esc_attr($status_value) . '">' . esc_html($status_label) . '</option>';
+        }
+
         $output = '<div class="post-meta-section">
         <h3>' . esc_html__('Post Content Options', 'draxira') . '</h3>
         <table class="form-table">
@@ -945,6 +961,13 @@ class Draxira
 
         $output .= '</select>
                     <span class="description">' . esc_html__('Select who will be the author of generated posts', 'draxira') . '</span>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">' . esc_html__('Post Status', 'draxira') . '</th>
+                <td>
+                    <select name="post_status" id="post-status-selector">' . $status_options . '</select>
+                    <p class="description">' . esc_html__('Scheduled posts get a random future publish date. "Random mix" picks a status per post.', 'draxira') . '</p>
                 </td>
             </tr>
             <tr>
@@ -1001,32 +1024,12 @@ class Draxira
         endif;
 
         if (!empty($meta_keys)):
+            $field_index = Draxira_Fields::index_for_post_type($post_type);
             $output .= '<h3>' . esc_html__('Custom Post Meta Fields', 'draxira') . '</h3>
-            <p class="description">' . esc_html__('Configure how each custom field should be filled. Only fields from ACF, CMB2, or similar plugins are listed.', 'draxira') . '</p>
-            <table class="widefat">
-                <thead>
-                    <tr>
-                        <th>' . esc_html__('Field Name', 'draxira') . '</th>
-                        <th>' . esc_html__('Meta Key', 'draxira') . '</th>
-                        <th>' . esc_html__('Faker Data Type', 'draxira') . '</th>
-                    </thead>
-                <tbody>';
+            <p class="description">' . esc_html__('Configure how each custom field should be filled. Only fields from ACF, CMB2, or similar plugins are listed. For complex ACF fields (gallery, repeater, post object, link ...) choose a Smart fill approach.', 'draxira') . '</p>
+            <table class="widefat">' . Draxira_Fields::render_head() . '<tbody>';
             foreach ($meta_keys as $meta_key => $field_label):
-                $output .= '<tr>
-                <td><strong>' . esc_html($field_label) . '</strong></td>
-                <td>
-                    <code>' . esc_html($meta_key) . '</code>
-                    <input type="hidden" name="post_meta[' . esc_attr($meta_key) . '][key]" value="' . esc_attr($meta_key) . '">
-                </td>
-                <td>
-                    <select name="post_meta[' . esc_attr($meta_key) . '][type]">
-                        <option value="">-- ' . esc_html__('Leave Empty', 'draxira') . ' --</option>';
-                foreach ($this->mc_drax_faker_types as $type_value => $type_label):
-                    $output .= '<option value="' . esc_attr($type_value) . '">' . esc_html($type_label) . '</option>';
-                endforeach;
-                $output .= '</select>
-                </td>
-            </tr>';
+                $output .= Draxira_Fields::render_row('post_meta', $meta_key, $field_label, $field_index, $this->mc_drax_faker_types);
             endforeach;
             $output .= '</tbody>
         </table>';
@@ -1088,9 +1091,13 @@ class Draxira
 
         $args = [
             'post_type' => $post_types,
-            'posts_per_page' => 50,
+            'posts_per_page' => -1,
             'meta_key' => DRAXIRA_META_KEY,
             'meta_value' => '1',
+            // Show Draxira content whatever its status (draft, pending, private, scheduled, trash ...).
+            'post_status' => Draxira_Helpers::all_post_statuses(),
+            'orderby' => 'date',
+            'order' => 'DESC',
         ];
 
         $dummy_posts = get_posts($args);
@@ -1106,6 +1113,7 @@ class Draxira
                     <th>' . esc_html__('ID', 'draxira') . '</th>
                     <th>' . esc_html__('Title', 'draxira') . '</th>
                     <th>' . esc_html__('Post Type', 'draxira') . '</th>
+                    <th>' . esc_html__('Status', 'draxira') . '</th>
                     <th>' . esc_html__('Taxonomies', 'draxira') . '</th>
                     <th>' . esc_html__('Date', 'draxira') . '</th>
                     <th>' . esc_html__('Actions', 'draxira') . '</th>
@@ -1128,6 +1136,7 @@ class Draxira
                 <td>' . esc_html($post->ID) . '</td>
                 <td><strong>' . esc_html($post->post_title) . '</strong></td>
                 <td>' . esc_html(get_post_type_object($post->post_type)->labels->singular_name) . '</td>
+                <td>' . Draxira_Helpers::status_badge($post->post_status) . '</td>
                 <td>' . (!empty($post_terms) ? esc_html(implode(', ', $post_terms)) : '<em>' . esc_html__('None', 'draxira') . '</em>') . '</td>
                 <td>' . esc_html(get_the_date('', $post)) . '</td>
                 <td>
@@ -1168,6 +1177,7 @@ class Draxira
         ?>
         <div class="wrap draxira">
             <h1><?php esc_html_e('Draxira – Dummy Content Generator', 'draxira'); ?></h1>
+            <?php Draxira_Helpers::render_nav('draxira'); ?>
 
             <?php $this->mc_drax_show_results_message(); ?>
 
@@ -1177,7 +1187,7 @@ class Draxira
             </h2>
 
             <div id="generate-tab" class="tab-content active">
-                <form method="post" action="" id="generate-posts-form">
+                <form method="post" action="" id="generate-posts-form" data-dx-batch="posts">
                     <?php wp_nonce_field('generate_dummy_posts'); ?>
                     <table class="form-table">
                         <tr>
@@ -1198,7 +1208,8 @@ class Draxira
                         <tr>
                             <th scope="row"><?php esc_html_e('Number of Posts', 'draxira'); ?></th>
                             <td>
-                                <input type="number" name="post_count" min="1" max="100" value="5">
+                                <input type="number" name="post_count" min="1" max="500" value="5">
+                                <p class="description"><?php esc_html_e('Runs in the background with a progress bar (up to 500 at a time).', 'draxira'); ?></p>
                             </td>
                         </tr>
                     </table>

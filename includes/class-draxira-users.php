@@ -114,6 +114,14 @@ class Draxira_Users
 
         // Cleanup hooks for permanent deletion
         add_action('deleted_user', [$this, 'mc_drax_cleanup_user_meta'], 10, 2);
+
+        // Background (AJAX batch) generation
+        Draxira_Batch::register('users', [
+            'capability' => 'create_users',
+            'prepare' => [$this, 'batch_prepare'],
+            'step' => [$this, 'batch_step'],
+            'finish' => [$this, 'batch_finish'],
+        ]);
     }
 
     /**
@@ -184,119 +192,159 @@ class Draxira_Users
      */
     private function mc_drax_generate_dummy_users()
     {
-        // Security check - prevent user creation if not allowed
+        // Fallback for browsers without JavaScript: run the whole job in this request.
+        $result = Draxira_Batch::run_sync('users', wp_unslash($_POST)); // phpcs:ignore WordPress.Security.NonceVerification -- verified in mc_drax_handle_user_actions().
+
+        set_transient('draxira_user_results', $result, 30);
+
+        wp_safe_redirect(admin_url('admin.php?page=draxira-users'));
+        exit;
+    }
+
+    /**
+     * Batch: validate the form.
+     *
+     * @since 1.0.8
+     * @param array $data Unslashed form data.
+     * @return array|WP_Error
+     */
+    public function batch_prepare($data)
+    {
         if (!current_user_can('create_users') && !current_user_can('promote_users')) {
-            set_transient('draxira_user_results', [
-                'message' => __('You do not have permission to create users.', 'draxira'),
-                'type' => 'error'
-            ], 30);
-            wp_safe_redirect(admin_url('admin.php?page=draxira-users'));
-            exit;
+            return new WP_Error('draxira_cap', __('You do not have permission to create users.', 'draxira'));
         }
 
-        $count = min(intval($_POST['user_count'] ?? 5), 20); // Limit to 20 users max
-        $role = sanitize_text_field($_POST['user_role'] ?? 'subscriber');
+        $count = max(1, min(intval($data['user_count'] ?? 5), 100));
+        $role = sanitize_key($data['user_role'] ?? 'subscriber');
 
         // Prevent creating admin users
         if ($role === 'administrator' && !current_user_can('create_users')) {
             $role = 'subscriber';
         }
-
-        // Get user meta configurations
-        $user_meta_config = [];
-        if (isset($_POST['user_meta']) && is_array($_POST['user_meta'])) {
-            foreach ($_POST['user_meta'] as $meta_key => $config) {
-                if (!empty($config['type'])) {
-                    $user_meta_config[$meta_key] = [
-                        'type' => sanitize_text_field($config['type'])
-                    ];
-                }
-            }
+        if (!get_role($role)) {
+            $role = 'subscriber';
         }
 
-        $results = ['success' => 0, 'failed' => 0];
-        $faker = $this->mc_drax_get_faker();
-
-        for ($i = 0; $i < $count; $i++) {
-            $username = $faker ? $faker->userName : 'dummyuser_' . uniqid();
-            $email = $faker ? $faker->email : $username . '@example.com';
-
-            // Ensure email is unique
-            $email = $this->mc_drax_get_unique_email($email);
-
-            // Create user with basic data
-            $userdata = [
-                'user_login' => $username,
-                'user_email' => $email,
-                'user_pass' => wp_generate_password(12, true, true), // Use strong random password
+        return [
+            'total' => $count,
+            'label' => __('Generating users…', 'draxira'),
+            'config' => [
                 'role' => $role,
-            ];
+                'meta' => Draxira_Fields::parse_config($data['user_meta'] ?? []),
+            ],
+            'state' => [],
+        ];
+    }
 
-            // Add optional user fields if configured
-            foreach ($user_meta_config as $meta_key => $config) {
-                $meta_value = $this->mc_drax_generate_faker_value($config['type']);
-                if ($meta_value !== '') {
-                    // Handle user table fields specially
-                    if (in_array($meta_key, ['user_url', 'display_name', 'description'])) {
-                        $userdata[$meta_key] = $meta_value;
-                    }
-                }
-            }
+    /**
+     * Batch: create one user.
+     *
+     * @since 1.0.8
+     * @param array $job   Job (by reference).
+     * @param int   $index Unit index.
+     * @return bool
+     */
+    public function batch_step(&$job, $index)
+    {
+        return $this->mc_drax_create_dummy_user($job['config']['role'], $job['config']['meta']);
+    }
 
-            $user_id = wp_insert_user($userdata);
-
-            if (!is_wp_error($user_id)) {
-                // Add our meta key
-                update_user_meta($user_id, DRAXIRA_META_KEY, '1');
-
-                // Also add a flag to indicate this is a test/dummy user
-                update_user_meta($user_id, '_draxira_is_dummy', '1');
-
-                // Always add first name and last name
-                if ($faker) {
-                    $first_name = $faker->firstName;
-                    $last_name = $faker->lastName;
-
-                    update_user_meta($user_id, 'first_name', $first_name);
-                    update_user_meta($user_id, 'last_name', $last_name);
-
-                    // Set display name if not already set
-                    if (!isset($userdata['display_name'])) {
-                        $display_name = $faker->boolean(70) ? "$first_name $last_name" : $username;
-                        wp_update_user([
-                            'ID' => $user_id,
-                            'display_name' => $display_name
-                        ]);
-                    }
-                }
-
-                // Add configured user meta
-                foreach ($user_meta_config as $meta_key => $config) {
-                    $meta_value = $this->mc_drax_generate_faker_value($config['type']);
-                    if ($meta_value !== '' && !in_array($meta_key, ['user_url', 'display_name', 'description'])) {
-                        update_user_meta($user_id, $meta_key, $meta_value);
-                    }
-                }
-
-                $results['success']++;
-            } else {
-                $results['failed']++;
-            }
-        }
-
-        set_transient('draxira_user_results', [
+    /**
+     * Batch: final notice.
+     *
+     * @since 1.0.8
+     * @param array $job Job.
+     * @return array
+     */
+    public function batch_finish($job)
+    {
+        return [
             'message' => sprintf(
                 /* translators: %1$d: number of generated users, %2$s: singular/plural of user, %3$d: number of failures */
                 __('Successfully generated %1$d %2$s. Failed: %3$d', 'draxira'),
-                $results['success'],
-                _n('user', 'users', $results['success'], 'draxira'),
-                $results['failed']
+                $job['success'],
+                _n('user', 'users', $job['success'], 'draxira'),
+                $job['failed']
             ),
-            'type' => 'success'
-        ], 30);
+            'type' => 'success',
+        ];
+    }
 
-        wp_safe_redirect(admin_url('admin.php?page=draxira-users'));
-        exit;
+    /**
+     * Create ONE dummy user.
+     *
+     * @since 1.0.8
+     * @param string $role             Role slug.
+     * @param array  $user_meta_config Posted meta configuration.
+     * @return bool
+     */
+    private function mc_drax_create_dummy_user($role, $user_meta_config)
+    {
+        $core_fields = ['user_url', 'display_name', 'description'];
+        $faker = $this->mc_drax_get_faker();
+
+        $username = $faker ? $faker->userName : 'dummyuser_' . uniqid();
+        if (username_exists($username)) {
+            $username .= wp_rand(10, 9999);
+        }
+        $email = $faker ? $faker->email : $username . '@example.com';
+
+        // Ensure email is unique
+        $email = $this->mc_drax_get_unique_email($email);
+
+        // Create user with basic data
+        $userdata = [
+            'user_login' => $username,
+            'user_email' => $email,
+            'user_pass' => wp_generate_password(12, true, true), // Use strong random password
+            'role' => $role,
+        ];
+
+        // Optional fields that live in the wp_users table
+        foreach ($user_meta_config as $meta_key => $config) {
+            if (in_array($meta_key, $core_fields, true)) {
+                $meta_value = $this->mc_drax_generate_faker_value($config['type']);
+                if ($meta_value !== '') {
+                    $userdata[$meta_key] = $meta_value;
+                }
+            }
+        }
+
+        $user_id = wp_insert_user($userdata);
+        if (is_wp_error($user_id)) {
+            return false;
+        }
+
+        // Add our meta key + dummy flag
+        update_user_meta($user_id, DRAXIRA_META_KEY, '1');
+        update_user_meta($user_id, '_draxira_is_dummy', '1');
+
+        // Always add first name and last name
+        if ($faker) {
+            $first_name = $faker->firstName;
+            $last_name = $faker->lastName;
+
+            update_user_meta($user_id, 'first_name', $first_name);
+            update_user_meta($user_id, 'last_name', $last_name);
+
+            if (!isset($userdata['display_name'])) {
+                $display_name = $faker->boolean(70) ? "$first_name $last_name" : $username;
+                wp_update_user(['ID' => $user_id, 'display_name' => $display_name]);
+            }
+        }
+
+        // Configured user meta (ACF complex fields included)
+        $object = ['type' => 'user', 'id' => $user_id];
+        $simple = function ($type) {
+            return $this->mc_drax_generate_faker_value($type);
+        };
+        foreach ($user_meta_config as $meta_key => $config) {
+            if (!in_array($meta_key, $core_fields, true)) {
+                Draxira_Fields::fill($object, $meta_key, $config, $simple);
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -699,6 +747,7 @@ class Draxira_Users
         ?>
         <div class="wrap draxira">
             <h1><?php esc_html_e('Draxira – Dummy Content Generator - Users', 'draxira'); ?></h1>
+            <?php Draxira_Helpers::render_nav('draxira-users'); ?>
 
             <?php
             $results = get_transient('draxira_user_results');
@@ -715,16 +764,16 @@ class Draxira_Users
             </h2>
 
             <div id="generate-users-tab" class="tab-content active">
-                <form method="post" action="" id="generate-users-form">
+                <form method="post" action="" id="generate-users-form" data-dx-batch="users">
                     <?php wp_nonce_field('generate_dummy_users'); ?>
                     <table class="form-table">
                         <tr>
                             <th scope="row"><?php esc_html_e('Number of Users', 'draxira'); ?></th>
                             <td>
-                                <input type="number" name="user_count" min="1" max="20" value="5">
-            </div>
-        </div>
-        <div class="form-field">
+                                <input type="number" name="user_count" min="1" max="100" value="5">
+                            </td>
+                        </tr>
+        <tr>
             <th scope="row"><?php esc_html_e('User Role', 'draxira'); ?></th>
             <td>
                 <select name="user_role">
@@ -736,7 +785,7 @@ class Draxira_Users
                     ?>
                 </select>
             </td>
-        </div>
+        </tr>
         </table>
 
         <div id="user-meta-configuration">
@@ -749,40 +798,18 @@ class Draxira_Users
                     <tr>
                         <th><?php esc_html_e('Field Name', 'draxira'); ?></th>
                         <th><?php esc_html_e('Field Key', 'draxira'); ?></th>
+                        <th><?php esc_html_e('Field Type', 'draxira'); ?></th>
                         <th><?php esc_html_e('Faker Data Type', 'draxira'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($user_meta_keys as $meta_key => $field_label):
+                    <?php
+                    $user_index = Draxira_Fields::index_for_users();
+                    foreach ($user_meta_keys as $meta_key => $field_label):
                         $auto_type = $this->mc_drax_get_auto_field_type($meta_key);
-                        ?>
-                        <tr>
-                            <td>
-                                <strong><?php echo esc_html($field_label); ?></strong>
-                            </td>
-                            <td>
-                                <code><?php echo esc_html($meta_key); ?></code>
-                                <input type="hidden" name="user_meta[<?php echo esc_attr($meta_key); ?>][key]"
-                                    value="<?php echo esc_attr($meta_key); ?>">
-                            </td>
-                            <td>
-                                <select name="user_meta[<?php echo esc_attr($meta_key); ?>][type]">
-                                    <option value="">-- <?php esc_html_e('Leave Empty', 'draxira'); ?> --</option>
-                                    <?php foreach ($this->mc_drax_faker_types as $type_value => $type_label):
-                                        $selected = ($type_value === $auto_type) ? 'selected' : '';
-                                        ?>
-                                        <option value="<?php echo esc_attr($type_value); ?>" <?php echo $selected; ?>>
-                                            <?php echo esc_html($type_label); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <?php if ($auto_type): ?>
-                                    <br><small
-                                        class="description"><?php esc_html_e('Auto-selected based on field name', 'draxira'); ?></small>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
+                        echo Draxira_Fields::render_row('user_meta', $meta_key, $field_label, $user_index, $this->mc_drax_faker_types, $auto_type, $auto_type ? __('Auto-selected based on field name', 'draxira') : ''); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside.
+                    endforeach;
+                    ?>
                 </tbody>
             </table>
         </div>

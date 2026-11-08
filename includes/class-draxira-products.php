@@ -152,6 +152,13 @@ class Draxira_Products
         // AJAX handlers
         add_action('wp_ajax_draxira_get_product_meta', [$this, 'mc_drax_ajax_get_product_meta']);
         add_action('wp_ajax_draxira_get_dummy_products', [$this, 'mc_drax_ajax_get_dummy_products']);
+
+        // Background (AJAX batch) generation
+        Draxira_Batch::register('products', [
+            'prepare' => [$this, 'batch_prepare'],
+            'step' => [$this, 'batch_step'],
+            'finish' => [$this, 'batch_finish'],
+        ]);
     }
 
     /**
@@ -516,109 +523,122 @@ class Draxira_Products
      */
     private function mc_drax_generate_dummy_products()
     {
-        if (!class_exists('WooCommerce')) {
-            set_transient('draxira_product_results', [
-                'message' => __('WooCommerce is not installed or activated.', 'draxira'),
-                'type' => 'error'
-            ], 30);
-            wp_safe_redirect(admin_url('admin.php?page=draxira-products'));
-            exit;
-        }
+        // Fallback for browsers without JavaScript: run the whole job in this request.
+        $result = Draxira_Batch::run_sync('products', wp_unslash($_POST)); // phpcs:ignore WordPress.Security.NonceVerification -- verified in mc_drax_handle_product_actions().
 
-        $count = min(intval($_POST['product_count'] ?? 5), 200);
-        $product_status = sanitize_text_field($_POST['product_status'] ?? 'publish');
-        $with_featured_image = isset($_POST['with_featured_image']);
-        $with_gallery = isset($_POST['with_gallery']);
-        $create_excerpt = isset($_POST['create_excerpt']);
-        $product_author = intval($_POST['product_author'] ?? get_current_user_id());
-
-        // Get custom meta configurations (only for custom fields)
-        $custom_meta_config = [];
-        if (isset($_POST['product_meta']) && is_array($_POST['product_meta'])) {
-            foreach ($_POST['product_meta'] as $meta_key => $config) {
-                if (!empty($config['type'])) {
-                    $custom_meta_config[$meta_key] = [
-                        'type' => sanitize_text_field($config['type'])
-                    ];
-                }
-            }
-        }
-
-        // Get taxonomy configurations
-        $taxonomy_config = [];
-        if (isset($_POST['taxonomies']) && is_array($_POST['taxonomies'])) {
-            foreach ($_POST['taxonomies'] as $taxonomy => $config) {
-                if (isset($config['create']) && $config['create'] === 'yes') {
-                    $taxonomy_config[$taxonomy] = [
-                        'create' => 'yes',
-                        'assign' => isset($config['assign']) ? intval($config['assign']) : ($taxonomy === 'product_brand' ? 1 : 2)
-                    ];
-                }
-            }
-        }
-
-        $results = ['success' => 0, 'failed' => 0, 'taxonomies_created' => 0];
-
-        // Create taxonomies if requested
-        $created_terms = [];
-        if (!empty($taxonomy_config)) {
-            foreach ($taxonomy_config as $taxonomy => $config) {
-                $terms = $this->mc_drax_create_dummy_terms($taxonomy, 10);
-                $created_terms[$taxonomy] = $terms;
-                $results['taxonomies_created'] += count($terms);
-            }
-        }
-
-        // Generate products
-        $available_data = $this->mc_drax_get_available_product_data();
-        $data_count = count($available_data);
-
-        if ($data_count === 0) {
-            set_transient('draxira_product_results', [
-                'message' => __('No product data found in CSV file. Please check the woo-data/woo.csv file.', 'draxira'),
-                'type' => 'error'
-            ], 30);
-            wp_safe_redirect(admin_url('admin.php?page=draxira-products'));
-            exit;
-        }
-
-        for ($i = 0; $i < $count; $i++) {
-            $data_index = $i % $data_count;
-            $product_data = $available_data[$data_index];
-
-            $product_id = $this->mc_drax_create_dummy_product(
-                $product_status,
-                $with_featured_image,
-                $with_gallery,
-                $create_excerpt,
-                $product_author,
-                $custom_meta_config,
-                $created_terms,
-                $taxonomy_config,
-                $product_data
-            );
-
-            if ($product_id && !is_wp_error($product_id)) {
-                $results['success']++;
-            } else {
-                $results['failed']++;
-            }
-        }
-
-        set_transient('draxira_product_results', [
-            'message' => sprintf(
-                /* translators: %1$d: number of generated products, %2$s: singular/plural of product, %3$d: number of taxonomy terms created, %4$d: number of failures */
-                __('Successfully generated %1$d %2$s with %3$d taxonomy terms. Failed: %4$d', 'draxira'),
-                $results['success'],
-                _n('product', 'products', $results['success'], 'draxira'),
-                $results['taxonomies_created'],
-                $results['failed']
-            ),
-            'type' => 'success'
-        ], 30);
+        set_transient('draxira_product_results', $result, 30);
 
         wp_safe_redirect(admin_url('admin.php?page=draxira-products'));
         exit;
+    }
+
+    /**
+     * Batch: validate the form, create shared terms and load the CSV rows.
+     *
+     * @since 1.0.8
+     * @param array $data Unslashed form data.
+     * @return array|WP_Error
+     */
+    public function batch_prepare($data)
+    {
+        if (!class_exists('WooCommerce')) {
+            return new WP_Error('draxira_wc', __('WooCommerce is not installed or activated.', 'draxira'));
+        }
+
+        $available_data = $this->mc_drax_get_available_product_data();
+        if (count($available_data) === 0) {
+            return new WP_Error('draxira_csv', __('No product data found in CSV file. Please check the woo-data/woo.csv file.', 'draxira'));
+        }
+
+        $count = max(1, min(intval($data['product_count'] ?? 5), 200));
+
+        $taxonomy_config = [];
+        if (isset($data['taxonomies']) && is_array($data['taxonomies'])) {
+            foreach ($data['taxonomies'] as $taxonomy => $config) {
+                if (isset($config['create']) && $config['create'] === 'yes' && taxonomy_exists($taxonomy)) {
+                    $taxonomy_config[sanitize_key($taxonomy)] = [
+                        'create' => 'yes',
+                        'assign' => isset($config['assign']) ? intval($config['assign']) : ($taxonomy === 'product_brand' ? 1 : 2),
+                    ];
+                }
+            }
+        }
+
+        $created_terms = [];
+        $terms_total = 0;
+        foreach ($taxonomy_config as $taxonomy => $config) {
+            $terms = $this->mc_drax_create_dummy_terms($taxonomy, 10);
+            $created_terms[$taxonomy] = $terms;
+            $terms_total += count($terms);
+        }
+
+        return [
+            'total' => $count,
+            'label' => __('Generating products…', 'draxira'),
+            'config' => [
+                'status' => sanitize_key($data['product_status'] ?? 'publish'),
+                'featured' => !empty($data['with_featured_image']),
+                'gallery' => !empty($data['with_gallery']),
+                'excerpt' => !empty($data['create_excerpt']),
+                'author' => intval($data['product_author'] ?? get_current_user_id()),
+                'meta' => Draxira_Fields::parse_config($data['product_meta'] ?? []),
+                'taxonomy' => $taxonomy_config,
+            ],
+            'state' => ['created_terms' => $created_terms, 'terms_total' => $terms_total],
+        ];
+    }
+
+    /**
+     * Batch: create one product.
+     *
+     * @since 1.0.8
+     * @param array $job   Job (by reference).
+     * @param int   $index Unit index.
+     * @return bool
+     */
+    public function batch_step(&$job, $index)
+    {
+        $available_data = $this->mc_drax_get_available_product_data();
+        if (empty($available_data)) {
+            return false;
+        }
+
+        $c = $job['config'];
+        $product_id = $this->mc_drax_create_dummy_product(
+            $c['status'],
+            $c['featured'],
+            $c['gallery'],
+            $c['excerpt'],
+            $c['author'],
+            $c['meta'],
+            $job['state']['created_terms'],
+            $c['taxonomy'],
+            $available_data[$index % count($available_data)]
+        );
+
+        return $product_id && !is_wp_error($product_id);
+    }
+
+    /**
+     * Batch: final notice.
+     *
+     * @since 1.0.8
+     * @param array $job Job.
+     * @return array
+     */
+    public function batch_finish($job)
+    {
+        return [
+            'message' => sprintf(
+                /* translators: %1$d: number of generated products, %2$s: singular/plural of product, %3$d: number of taxonomy terms created, %4$d: number of failures */
+                __('Successfully generated %1$d %2$s with %3$d taxonomy terms. Failed: %4$d', 'draxira'),
+                $job['success'],
+                _n('product', 'products', $job['success'], 'draxira'),
+                $job['state']['terms_total'],
+                $job['failed']
+            ),
+            'type' => 'success',
+        ];
     }
 
     /**
@@ -653,6 +673,10 @@ class Draxira_Products
             $author = get_current_user_id();
         }
 
+        // Status: publish, draft, pending, private, scheduled or a random mix.
+        $resolved_status = Draxira_Helpers::resolve_post_status($status);
+        $status = $resolved_status['post_status'];
+
         // Get product name from CSV
         $product_name = !empty($product_data['Name']) ? $product_data['Name'] : 'Dummy Product';
 
@@ -670,6 +694,7 @@ class Draxira_Products
             'post_type' => 'product',
             'post_author' => $author,
         ];
+        $product_args = array_merge($product_args, $resolved_status);
 
         // Add excerpt if requested
         if ($create_excerpt && !empty($short_description)) {
@@ -717,7 +742,7 @@ class Draxira_Products
                 // Create variations if they exist in CSV
                 $variations = $this->mc_drax_get_variations_by_sku($product_data['SKU']);
                 if (!empty($variations)) {
-                    $this->mc_drax_create_product_variations($product_id, $variations, $status, $author);
+                    $this->mc_drax_create_product_variations($product_id, $variations, in_array($status, ['publish', 'private', 'draft'], true) ? $status : 'publish', $author);
                 }
             }
 
@@ -741,13 +766,12 @@ class Draxira_Products
             }
 
             // Add custom meta fields (only these use faker)
+            $object = ['type' => 'post', 'id' => $product_id, 'post_type' => 'product'];
+            $simple = function ($type) {
+                return $this->mc_drax_get_custom_meta_value($type);
+            };
             foreach ($custom_meta_config as $meta_key => $config) {
-                if (!empty($config['type'])) {
-                    $meta_value = $this->mc_drax_get_custom_meta_value($config['type']);
-                    if ($meta_value !== '' && $meta_value !== null) {
-                        update_post_meta($product_id, $meta_key, $meta_value);
-                    }
-                }
+                Draxira_Fields::fill($object, $meta_key, $config, $simple);
             }
 
             return $product_id;
@@ -766,55 +790,20 @@ class Draxira_Products
      */
     private function mc_drax_attach_featured_image_from_local($product_id)
     {
-        $image_dir = DRAXIRA_PLUGIN_DIR . 'assets/img/product_featured/';
+        $attachment_id = Draxira_Helpers::import_random_image(
+            DRAXIRA_PLUGIN_DIR . 'assets/img/product_featured/',
+            '/\.(jpe?g|png|gif)$/i',
+            $product_id,
+            'product',
+            'products'
+        );
 
-        if (!file_exists($image_dir)) {
+        if (!$attachment_id) {
+            error_log('Draxira: product featured image failed - ' . Draxira_Helpers::$image_error);
             return false;
         }
 
-        // Get all jpg images from the folder
-        $images = glob($image_dir . '*.jpg');
-
-        if (empty($images)) {
-            return false;
-        }
-
-        // Select a random image
-        $random_image = $images[array_rand($images)];
-        $filename = basename($random_image);
-
-        // Check if image already exists in media library
-        $existing_image = $this->mc_drax_get_attachment_by_title($filename);
-
-        if ($existing_image) {
-            set_post_thumbnail($product_id, $existing_image);
-            return true;
-        }
-
-        // Upload image to media library
-        $upload_file = wp_upload_bits($filename, null, file_get_contents($random_image));
-
-        if (!$upload_file['error']) {
-            $wp_filetype = wp_check_filetype($filename, null);
-            $attachment = [
-                'post_mime_type' => $wp_filetype['type'],
-                'post_title' => preg_replace('/\.[^.]+$/', '', $filename),
-                'post_content' => '',
-                'post_status' => 'inherit'
-            ];
-
-            $attachment_id = wp_insert_attachment($attachment, $upload_file['file']);
-
-            if (!is_wp_error($attachment_id)) {
-                require_once(ABSPATH . 'wp-admin/includes/image.php');
-                $attachment_data = wp_generate_attachment_metadata($attachment_id, $upload_file['file']);
-                wp_update_attachment_metadata($attachment_id, $attachment_data);
-                set_post_thumbnail($product_id, $attachment_id);
-                return true;
-            }
-        }
-
-        return false;
+        return (bool) set_post_thumbnail($product_id, $attachment_id);
     }
 
     /**
@@ -999,7 +988,7 @@ class Draxira_Products
                     $images = explode(',', $variation_data['Images']);
                     $first_image = trim($images[0]);
                     if (!empty($first_image) && filter_var($first_image, FILTER_VALIDATE_URL)) {
-                        $attachment_id = $this->mc_drax_upload_image_from_url($first_image, $variation_id . '-variation');
+                        $attachment_id = $this->mc_drax_upload_image_from_url($first_image, $variation_id . '-variation', $variation_id);
                         if ($attachment_id) {
                             set_post_thumbnail($variation_id, $attachment_id);
                         }
@@ -1174,7 +1163,7 @@ class Draxira_Products
         $first_image = trim($images_list[0]);
 
         if (!empty($first_image) && filter_var($first_image, FILTER_VALIDATE_URL)) {
-            $attachment_id = $this->mc_drax_upload_image_from_url($first_image, $product_id . '-featured');
+            $attachment_id = $this->mc_drax_upload_image_from_url($first_image, $product_id . '-featured', $product_id);
             if ($attachment_id) {
                 set_post_thumbnail($product_id, $attachment_id);
                 return true;
@@ -1191,9 +1180,10 @@ class Draxira_Products
      * @access private
      * @param string $image_url     Image URL
      * @param string $filename_base Base filename
+     * @param int    $content_id    Product/variation the image is for (media registry)
      * @return int|false Attachment ID on success, false on failure
      */
-    private function mc_drax_upload_image_from_url($image_url, $filename_base)
+    private function mc_drax_upload_image_from_url($image_url, $filename_base, $content_id = 0)
     {
         if (!filter_var($image_url, FILTER_VALIDATE_URL)) {
             return false;
@@ -1237,6 +1227,7 @@ class Draxira_Products
                 require_once(ABSPATH . 'wp-admin/includes/image.php');
                 $attachment_data = wp_generate_attachment_metadata($attachment_id, $upload_file['file']);
                 wp_update_attachment_metadata($attachment_id, $attachment_data);
+                Draxira_Media::register($attachment_id, $content_id, '', 'products');
                 return $attachment_id;
             }
         }
@@ -1254,51 +1245,28 @@ class Draxira_Products
      */
     private function mc_drax_attach_product_gallery($product_id)
     {
-        $image_dir = DRAXIRA_PLUGIN_DIR . 'assets/img/products/';
-
-        if (!file_exists($image_dir)) {
-            return;
-        }
-
-        $product_images = glob($image_dir . 'dummy_content_filler_product_img_*.{jpg,jpeg,png,gif}', GLOB_BRACE);
-
-        if (empty($product_images)) {
-            return;
-        }
-
-        $gallery_count = wp_rand(2, min(4, count($product_images)));
-        shuffle($product_images);
-        $selected_images = array_slice($product_images, 0, $gallery_count);
+        $images = Draxira_Helpers::list_images(
+            DRAXIRA_PLUGIN_DIR . 'assets/img/products/',
+            '/^dummy_content_filler_product_img_\d+\.(jpe?g|png|gif)$/i'
+        );
 
         $gallery_ids = [];
 
-        foreach ($selected_images as $image_path) {
-            $filename = basename($image_path);
-            $existing_image = $this->mc_drax_get_attachment_by_title($filename);
-
-            if ($existing_image) {
-                $gallery_ids[] = $existing_image;
-                continue;
+        if (empty($images)) {
+            // Bundled images missing: use generated placeholders so galleries still work.
+            $count = wp_rand(2, 3);
+            for ($i = 0; $i < $count; $i++) {
+                $id = Draxira_Helpers::import_random_image('', '', $product_id, 'product', 'products');
+                if ($id) {
+                    $gallery_ids[] = $id;
+                }
             }
-
-            $upload_file = wp_upload_bits($filename, null, file_get_contents($image_path));
-
-            if (!$upload_file['error']) {
-                $wp_filetype = wp_check_filetype($filename, null);
-                $attachment = [
-                    'post_mime_type' => $wp_filetype['type'],
-                    'post_title' => preg_replace('/\.[^.]+$/', '', $filename),
-                    'post_content' => '',
-                    'post_status' => 'inherit'
-                ];
-
-                $attachment_id = wp_insert_attachment($attachment, $upload_file['file']);
-
-                if (!is_wp_error($attachment_id)) {
-                    require_once(ABSPATH . 'wp-admin/includes/image.php');
-                    $attachment_data = wp_generate_attachment_metadata($attachment_id, $upload_file['file']);
-                    wp_update_attachment_metadata($attachment_id, $attachment_data);
-                    $gallery_ids[] = $attachment_id;
+        } else {
+            shuffle($images);
+            foreach (array_slice($images, 0, wp_rand(2, min(4, count($images)))) as $path) {
+                $id = Draxira_Helpers::import_image($path, $product_id, 'product', 'products');
+                if ($id) {
+                    $gallery_ids[] = $id;
                 }
             }
         }
@@ -1388,7 +1356,7 @@ class Draxira_Products
             'meta_key' => DRAXIRA_META_KEY,
             'meta_value' => '1',
             'fields' => 'ids',
-            'post_status' => 'any',
+            'post_status' => Draxira_Helpers::all_post_statuses(),
         ];
 
         $dummy_products = get_posts($args);
@@ -1478,14 +1446,13 @@ class Draxira_Products
                         </select>
                         <span
                             class="description"><?php esc_html_e('Select who will be the author of generated products', 'draxira'); ?></span>
-        </div>
-        </div>
-        </div>
+                    </td>
+                </tr>
         <tr>
             <th scope="row"><?php esc_html_e('Product Status', 'draxira'); ?></th>
             <td>
                 <select name="product_status">
-                    <?php foreach ($this->mc_drax_product_statuses as $status_value => $status_label): ?>
+                    <?php foreach (Draxira_Helpers::post_status_choices(true) as $status_value => $status_label): ?>
                         <option value="<?php echo esc_attr($status_value); ?>"><?php echo esc_html($status_label); ?>
                         </option>
                     <?php endforeach; ?>
@@ -1495,8 +1462,8 @@ class Draxira_Products
         <tr>
             <th scope="row"> <?php esc_html_e('Number of Products', 'draxira'); ?> </th>
             <td>
-                <input type="number" name="product_count" min="1" max="40" value="5" style="width: 100px;">
-                <p class="description"> <?php esc_html_e('Maximum 40 products at a time', 'draxira'); ?> </p>
+                <input type="number" name="product_count" min="1" max="200" value="5" style="width: 100px;">
+                <p class="description"> <?php esc_html_e('Runs in the background with a progress bar (up to 200 at a time)', 'draxira'); ?> </p>
             </td>
         </tr>
         <tr>
@@ -1578,35 +1545,17 @@ class Draxira_Products
                     <tr>
                         <th><?php esc_html_e('Field Name', 'draxira'); ?></th>
                         <th><?php esc_html_e('Meta Key', 'draxira'); ?></th>
-                        <th><?php esc_html_e('Data Type / Value', 'draxira'); ?></th>
+                        <th><?php esc_html_e('Field Type', 'draxira'); ?></th>
+                        <th><?php esc_html_e('Fill With', 'draxira'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php
-                    $faker_types = $this->mc_drax_faker_types;
-
-                    foreach ($meta_keys as $meta_key => $field_label):
-                        ?>
-                        <tr>
-                            <td>
-                                <strong><?php echo esc_html($field_label); ?></strong>
-                            </td>
-                            <td>
-                                <code><?php echo esc_html($meta_key); ?></code>
-                                <input type="hidden" name="product_meta[<?php echo esc_attr($meta_key); ?>][key]"
-                                    value="<?php echo esc_attr($meta_key); ?>">
-                            </td>
-                            <td>
-                                <select name="product_meta[<?php echo esc_attr($meta_key); ?>][type]" class="product-meta-type">
-                                    <?php foreach ($faker_types as $type_value => $type_label): ?>
-                                        <option value="<?php echo esc_attr($type_value); ?>">
-                                            <?php echo esc_html($type_label); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
+                    $product_index = Draxira_Fields::index_for_post_type('product');
+                    foreach ($meta_keys as $meta_key => $field_label) {
+                        echo Draxira_Fields::render_row('product_meta', $meta_key, $field_label, $product_index, $this->mc_drax_faker_types); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside.
+                    }
+                    ?>
                 </tbody>
             </table>
         <?php else: ?>
@@ -1637,9 +1586,13 @@ class Draxira_Products
 
         $args = [
             'post_type' => 'product',
-            'posts_per_page' => 50,
+            'posts_per_page' => -1,
             'meta_key' => DRAXIRA_META_KEY,
             'meta_value' => '1',
+            // Show Draxira products whatever their status (draft, pending, private, scheduled ...).
+            'post_status' => Draxira_Helpers::all_post_statuses(),
+            'orderby' => 'date',
+            'order' => 'DESC',
         ];
 
         $dummy_products = get_posts($args);
@@ -1656,6 +1609,7 @@ class Draxira_Products
                 <tr>
                     <th><?php esc_html_e('ID', 'draxira'); ?></th>
                     <th><?php esc_html_e('Product', 'draxira'); ?></th>
+                    <th><?php esc_html_e('Status', 'draxira'); ?></th>
                     <th><?php esc_html_e('Type', 'draxira'); ?></th>
                     <th><?php esc_html_e('Price', 'draxira'); ?></th>
                     <th><?php esc_html_e('SKU', 'draxira'); ?></th>
@@ -1680,6 +1634,7 @@ class Draxira_Products
                         <td>
                             <strong><?php echo esc_html($product->post_title); ?></strong>
                         </td>
+                        <td><?php echo wp_kses_post(Draxira_Helpers::status_badge($product->post_status)); ?></td>
                         <td><?php echo esc_html($type); ?></td>
                         <td><?php echo wp_kses_post($price); ?></td>
                         <td><?php echo esc_html($sku); ?></td>
@@ -1728,6 +1683,7 @@ class Draxira_Products
         ?>
         <div class="wrap draxira">
             <h1><?php esc_html_e('Draxira – Dummy Content Generator - WooCommerce Products', 'draxira'); ?></h1>
+            <?php Draxira_Helpers::render_nav('draxira-products'); ?>
 
             <?php if ($data_count === 0): ?>
                 <div class="notice notice-warning">
@@ -1759,7 +1715,7 @@ class Draxira_Products
             </h2>
 
             <div id="generate-products-tab" class="tab-content active">
-                <form method="post" action="" id="generate-products-form">
+                <form method="post" action="" id="generate-products-form" data-dx-batch="products">
                     <?php wp_nonce_field('generate_dummy_products'); ?>
                     <div id="product-meta-configuration">
                         <!-- Loaded via AJAX -->

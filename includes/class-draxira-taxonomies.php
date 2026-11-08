@@ -112,6 +112,13 @@ class Draxira_Taxonomies
 
         // Enqueue scripts
         add_action('admin_enqueue_scripts', [$this, 'mc_drax_enqueue_taxonomies_scripts']);
+
+        // Background (AJAX batch) generation
+        Draxira_Batch::register('taxonomies', [
+            'prepare' => [$this, 'batch_prepare'],
+            'step' => [$this, 'batch_step'],
+            'finish' => [$this, 'batch_finish'],
+        ]);
     }
 
     /**
@@ -369,56 +376,6 @@ class Draxira_Taxonomies
         return 'text';
     }
 
-    // /**
-    //  * Handle taxonomy form submissions
-    //  *
-    //  * @since 1.0.0
-    //  * @access public
-    //  * @return void
-    //  */
-    // public function mc_drax_handle_taxonomies_actions()
-    // {
-    //     if (!current_user_can('manage_options')) {
-    //         return;
-    //     }
-
-    //     if (isset($_POST['generate_terms']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['_wpnonce'] ?? '')), 'generate_dummy_terms')) {
-    //         $this->mc_drax_generate_dummy_terms();
-    //     }
-
-    //     $auto_assign_terms = isset($_POST['auto_assign_terms']) ? true : false;
-    //     $post_type = sanitize_text_field($_POST['post_type'] ?? 'post');
-
-    //     foreach ($selected_taxonomies as $taxonomy_slug) {
-    //         $terms_created = $this->mc_drax_create_dummy_terms_for_taxonomy(
-    //             $taxonomy_slug,
-    //             $terms_per_taxonomy,
-    //             $term_meta_config,
-    //             $auto_assign_terms,  // Add this parameter
-    //             $post_type           // Add this parameter
-    //         );
-
-    //         $results['success'] += $terms_created['success'];
-    //         $results['failed'] += $terms_created['failed'];
-    //     }
-
-    //     $clear_terms_nonce_action = 'clear_dummy_terms';
-    //     if (isset($_REQUEST['clear_dummy_terms']) && isset($_REQUEST['_wpnonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_REQUEST['_wpnonce'])), $clear_terms_nonce_action)) {
-    //         $deleted_count = $this->mc_drax_clear_dummy_terms();
-
-    //         set_transient('draxira_taxonomies_results', [
-    //             'message' => sprintf(
-    //                 /* translators: %1$d: number of deleted terms */
-    //                 __('Successfully deleted %1$d dummy taxonomy terms (and associated data).', 'draxira'),
-    //                 $deleted_count
-    //             ),
-    //             'type' => 'success'
-    //         ], 45);
-
-    //         wp_safe_redirect(admin_url('admin.php?page=draxira-taxonomies'));
-    //         exit;
-    //     }
-    // }
 
     /**
      * Handle taxonomy form submissions
@@ -532,80 +489,103 @@ class Draxira_Taxonomies
      */
     private function mc_drax_generate_dummy_terms()
     {
-        $post_type = sanitize_text_field($_POST['post_type'] ?? 'post');
-        $terms_per_taxonomy = intval($_POST['terms_per_taxonomy'] ?? 10);
-        $terms_per_taxonomy = min($terms_per_taxonomy, 50); // Max 50 terms per taxonomy
+        // Fallback for browsers without JavaScript: run the whole job in this request.
+        $result = Draxira_Batch::run_sync('taxonomies', wp_unslash($_POST)); // phpcs:ignore WordPress.Security.NonceVerification -- verified in mc_drax_handle_taxonomies_actions().
 
-        // Get auto-assign settings
-        $auto_assign_terms = isset($_POST['auto_assign_terms']) ? true : false;
-        $assign_posts_count = isset($_POST['assign_posts_count']) ? intval($_POST['assign_posts_count']) : 3;
-        $assign_posts_count = min($assign_posts_count, 20); // Max 20 posts per term
+        set_transient('draxira_taxonomies_results', $result, 30);
 
-        // Get selected taxonomies
-        $selected_taxonomies = [];
-        if (isset($_POST['selected_taxonomies']) && is_array($_POST['selected_taxonomies'])) {
-            $selected_taxonomies = array_map('sanitize_text_field', $_POST['selected_taxonomies']);
-        }
+        wp_safe_redirect(admin_url('admin.php?page=draxira-taxonomies'));
+        exit;
+    }
 
-        // Get term meta configurations
-        $term_meta_config = [];
-        if (isset($_POST['term_meta']) && is_array($_POST['term_meta'])) {
-            foreach ($_POST['term_meta'] as $meta_key => $config) {
-                if (!empty($config['type'])) {
-                    $term_meta_config[$meta_key] = [
-                        'type' => sanitize_text_field($config['type'])
-                    ];
+    /**
+     * Batch: validate the form. One unit of work = one taxonomy.
+     *
+     * @since 1.0.8
+     * @param array $data Unslashed form data.
+     * @return array|WP_Error
+     */
+    public function batch_prepare($data)
+    {
+        $selected = [];
+        if (isset($data['selected_taxonomies']) && is_array($data['selected_taxonomies'])) {
+            foreach ($data['selected_taxonomies'] as $slug) {
+                $slug = sanitize_key($slug);
+                if (taxonomy_exists($slug)) {
+                    $selected[] = $slug;
                 }
             }
         }
 
-        if (empty($selected_taxonomies)) {
-            set_transient('draxira_taxonomies_results', [
-                'message' => __('Please select at least one taxonomy to generate terms.', 'draxira'),
-                'type' => 'error'
-            ], 30);
-            wp_safe_redirect(admin_url('admin.php?page=draxira-taxonomies'));
-            exit;
+        if (empty($selected)) {
+            return new WP_Error('draxira_tax', __('Please select at least one taxonomy to generate terms.', 'draxira'));
         }
 
-        $results = ['success' => 0, 'failed' => 0, 'assigned' => 0];
+        return [
+            'total' => count($selected),
+            'label' => __('Generating taxonomy terms…', 'draxira'),
+            'config' => [
+                'taxonomies' => $selected,
+                'per_taxonomy' => max(1, min(intval($data['terms_per_taxonomy'] ?? 10), 50)),
+                'auto_assign' => !empty($data['auto_assign_terms']),
+                'assign_count' => max(1, min(intval($data['assign_posts_count'] ?? 3), 20)),
+                'post_type' => sanitize_key($data['post_type'] ?? 'post'),
+                'meta' => Draxira_Fields::parse_config($data['term_meta'] ?? []),
+            ],
+            'state' => ['assigned' => 0],
+        ];
+    }
 
-        foreach ($selected_taxonomies as $taxonomy_slug) {
-            $terms_created = $this->mc_drax_create_dummy_terms_for_taxonomy(
-                $taxonomy_slug,
-                $terms_per_taxonomy,
-                $term_meta_config,
-                $auto_assign_terms,
-                $post_type,
-                $assign_posts_count
-            );
-
-            $results['success'] += $terms_created['success'];
-            $results['failed'] += $terms_created['failed'];
-            $results['assigned'] += $terms_created['assigned'];
-        }
-
-        // Build success message
-        $message = sprintf(
-            __('Successfully generated %1$d taxonomy terms. Failed: %2$d', 'draxira'),
-            $results['success'],
-            $results['failed']
+    /**
+     * Batch: create the terms of one taxonomy.
+     *
+     * @since 1.0.8
+     * @param array $job   Job (by reference).
+     * @param int   $index Unit index.
+     * @return array
+     */
+    public function batch_step(&$job, $index)
+    {
+        $c = $job['config'];
+        $result = $this->mc_drax_create_dummy_terms_for_taxonomy(
+            $c['taxonomies'][$index],
+            $c['per_taxonomy'],
+            $c['meta'],
+            $c['auto_assign'],
+            $c['post_type'],
+            $c['assign_count']
         );
 
-        if ($auto_assign_terms && $results['assigned'] > 0) {
+        $job['state']['assigned'] += $result['assigned'];
+
+        return ['success' => $result['success'], 'failed' => $result['failed']];
+    }
+
+    /**
+     * Batch: final notice.
+     *
+     * @since 1.0.8
+     * @param array $job Job.
+     * @return array
+     */
+    public function batch_finish($job)
+    {
+        $message = sprintf(
+            /* translators: %1$d: number of generated terms, %2$d: number of failures */
+            __('Successfully generated %1$d taxonomy terms. Failed: %2$d', 'draxira'),
+            $job['success'],
+            $job['failed']
+        );
+
+        if (!empty($job['config']['auto_assign']) && $job['state']['assigned'] > 0) {
             $message .= ' ' . sprintf(
+                /* translators: %d: number of posts */
                 __('Terms were automatically assigned to %d posts.', 'draxira'),
-                $results['assigned']
+                $job['state']['assigned']
             );
         }
 
-        set_transient('draxira_taxonomies_results', [
-            'message' => $message,
-            'type' => 'success'
-        ], 30);
-
-        wp_safe_redirect(admin_url('admin.php?page=draxira-taxonomies'));
-        exit;
+        return ['message' => $message, 'type' => 'success'];
     }
 
     // /**
@@ -792,13 +772,12 @@ class Draxira_Taxonomies
                 add_term_meta($term_id, DRAXIRA_META_KEY, '1');
 
                 // Add term meta fields
+                $object = ['type' => 'term', 'id' => $term_id, 'taxonomy' => $taxonomy_slug];
+                $simple = function ($type) use ($faker) {
+                    return $this->mc_drax_generate_faker_value($type, $faker);
+                };
                 foreach ($term_meta_config as $meta_key => $config) {
-                    if (!empty($config['type'])) {
-                        $meta_value = $this->mc_drax_generate_faker_value($config['type'], $faker);
-                        if ($meta_value !== '' && $meta_value !== null) {
-                            update_term_meta($term_id, $meta_key, $meta_value);
-                        }
-                    }
+                    Draxira_Fields::fill($object, $meta_key, $config, $simple);
                 }
 
                 // Auto-assign term to random posts if enabled
@@ -1050,43 +1029,23 @@ class Draxira_Taxonomies
 
             <?php if (!empty($meta_fields)): ?>
                 <table class="widefat">
-                    <thead>
-                        <tr>
-                            <th><?php esc_html_e('Field Name', 'draxira'); ?></th>
-                            <th><?php esc_html_e('Meta Key', 'draxira'); ?></th>
-                            <th><?php esc_html_e('Data Type', 'draxira'); ?></th>
-                    </thead>
+                    <?php echo Draxira_Fields::render_head(__('Meta Key', 'draxira'), __('Fill With', 'draxira')); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside. ?>
                     <tbody>
-                        <?php foreach ($meta_fields as $meta_key => $field_data):
-                            $auto_type = $field_data['type'];
-                            ?>
-                            <tr>
-                                <td>
-                                    <strong><?php echo esc_html($field_data['label']); ?></strong>
-                                </td>
-                                <td>
-                                    <code><?php echo esc_html($meta_key); ?></code>
-                                    <input type="hidden" name="term_meta[<?php echo esc_attr($meta_key); ?>][key]"
-                                        value="<?php echo esc_attr($meta_key); ?>">
-                                </td>
-                                <td>
-                                    <select name="term_meta[<?php echo esc_attr($meta_key); ?>][type]">
-                                        <option value="">-- <?php esc_html_e('Do not fill', 'draxira'); ?> --</option>
-                                        <?php foreach ($this->mc_drax_faker_types as $type_value => $type_label):
-                                            $selected = ($type_value === $auto_type) ? 'selected' : '';
-                                            ?>
-                                            <option value="<?php echo esc_attr($type_value); ?>" <?php echo $selected; ?>>
-                                                <?php echo esc_html($type_label); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <?php if ($auto_type): ?>
-                                        <br><small
-                                            class="description"><?php esc_html_e('Recommended based on field name', 'draxira'); ?></small>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
+                        <?php
+                        $term_index = Draxira_Fields::index_for_taxonomy($taxonomy);
+                        foreach ($meta_fields as $meta_key => $field_data) {
+                            echo Draxira_Fields::render_row( // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside.
+                                'term_meta',
+                                $meta_key,
+                                $field_data['label'],
+                                $term_index,
+                                $this->mc_drax_faker_types,
+                                $field_data['type'],
+                                $field_data['type'] ? __('Recommended based on field name', 'draxira') : '',
+                                __('Do not fill', 'draxira')
+                            );
+                        }
+                        ?>
                     </tbody>
                 </table>
             <?php else: ?>
@@ -1277,6 +1236,7 @@ class Draxira_Taxonomies
         ?>
         <div class="wrap draxira">
             <h1><?php esc_html_e('Draxira – Dummy Content Generator - Taxonomies', 'draxira'); ?></h1>
+            <?php Draxira_Helpers::render_nav('draxira-taxonomies'); ?>
 
             <?php
             $results = get_transient('draxira_taxonomies_results');
@@ -1295,7 +1255,7 @@ class Draxira_Taxonomies
 
             <!-- Generate Terms Tab -->
             <div id="generate-terms-tab" class="tab-content active">
-                <form method="post" action="" id="generate-terms-form">
+                <form method="post" action="" id="generate-terms-form" data-dx-batch="taxonomies">
                     <?php wp_nonce_field('generate_dummy_terms'); ?>
 
                     <table class="form-table">

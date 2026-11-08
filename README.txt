@@ -2,9 +2,9 @@
 Contributors: microcodes
 Tags: dummy content, dummy posts, test data, dummy users, content generator
 Requires at least: 5.0
-Tested up to: 6.9
+Tested up to: 7.0
 Requires PHP: 7.2
-Stable tag: 1.0.3
+Stable tag: 1.0.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -127,14 +127,40 @@ Draxira is designed to be lightweight and efficient. It only loads its scripts o
 
 Yes! Please visit our [GitHub repository](https://github.com/microcodes/draxira) for issues, feature requests, and contributions.
 
+= When plugin uninstall, did all dummy posts-types, dummy images & meta also deleted? =
+
+Yes! when you uninstall this plugin that time all the dummy data generated using this plugin is safely deleted.
+
 == Screenshots ==
 
-1. **Post Types Generation Interface** - Configure posts, pages, and custom post types
-2. **Post Meta & Taxonomy** - Configure post-meta and taxonomy which assigned to post-type, their assigned per post.
-3. **User Generation Interface** - Generate users along with user-meta with custom options.
-4. **WooCommerce Products Generation Interface** - Generate woocommerce products with author, product meta, taxonomy and custom fields.
+1. **Post Types** - Configure post-types with meta fields.
+2. **Post Type Meta Fields** - Configure post-meta and suitable input types.
+3. **Post Type Meta Fields** - Newly introduced support for acf complex meta fields(gallery, repeater, link etc.)
+4. **Users Tab** - Create dummy users based on roles. User meta also configurable.
+5. **Manage Dummy Posts Tab** - How many dummy posts generated - detect, filter & delete.
+6. **woocommerce Products Tab** - Create dummy products & manage product meta fields.
+7. **Comments Tab** - Create comments & replies for post-types(ex: post, products, cpts etc.).
+8. **woocommerce Orders Tab** - Create dummy orders against perticular customer or random users. It supports date range & more.
+4. **Media Manager Tab** - List of dummy images uploaded to /wp-content using this plugin. Manage & even delete them in bulk.
 
 == Changelog ==
+
+= 1.0.7 =
+* Plugin UI improved.
+* Smart field entry for acf fields(ex: gallery, link, image, repeater etc.)
+* Woo Orders - generate orders against customer for products.
+* Media Manager - manage all media which are created in wp-content/ using this plugin.
+
+= 1.0.6 =
+* WooCommerce product's images improved and csv updated.
+
+= 1.0.5 =
+* Product images improvement & Bug fixes.
+
+= 1.0.4 =
+* Dummy post's, product's show listing increase from 50 to 20000.
+* Inside comments under deletion tab added product reviews support. 
+* Taxonomies deletion tab dummy taxonomies views number increases. 
 
 = 1.0.3 =
 * Enhanced Review System: Significant improvements made to the native product review functionality.
@@ -180,6 +206,15 @@ Yes! Please visit our [GitHub repository](https://github.com/microcodes/draxira)
   - Performance optimizations for bulk operations
 
 == Upgrade Notice ==
+
+= 1.0.7 =
+Plugin UI improved; smart ACF field entry (gallery, link, image, repeater, etc.); WooCommerce order generation for customers and products; Media Manager to manage all media created in `wp-content/` by the plugin.
+
+= 1.0.6 =
+WooCommerce product's images improved and csv updated.
+
+= 1.0.4 =
+Increased dummy posts/products listing limit from 50 → 20,000, added product reviews support in comments deletion tab, and expanded dummy taxonomies view count in deletion tab.
 
 = 1.0.3 =
 This update focuses on scaling and speed for WooCommerce, highlighted by an optimized product creation engine that is now 10x faster. The system expands utility with a bulk addition tool supporting up to 40 products at once, an enhanced native review system, and a specialized asset library featuring Ancient Indian imagery.
